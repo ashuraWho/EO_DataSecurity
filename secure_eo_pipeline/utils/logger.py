@@ -1,10 +1,8 @@
-# Import the standard logging library to enable system-wide event tracking
-import logging
-# Import sys to gain access to standard system streams (like stdout for console output)
-import sys
+import logging  # For audit trail
+import sys  # For stdout
 
 # =============================================================================
-# Logging & Audit Module - Line-by-Line Technical Explanation
+# Logging & Audit Module
 # =============================================================================
 # PURPOSE:
 # In mission-critical systems, "Auditability" is a core security requirement.
@@ -17,6 +15,7 @@ import sys
 # =============================================================================
 
 def setup_logger(name="EO_Pipeline"):
+    
     """
     Initializes and configures a standardized logging object.
     
@@ -24,42 +23,42 @@ def setup_logger(name="EO_Pipeline"):
         name (str): The logical name of the component being logged.
         
     DESIGN RATIONALE:
-    We use a unified format so that automated security tools (like a SIEM)
+    We use a unified format so that automated security tools
     can easily parse our logs and alert us of anomalies.
     """
+    
     # Create or retrieve a logger instance with the specified name
-    logger = logging.getLogger(name)
+    logger = logging.getLogger(name)  # Gets or creates a named logger
     
     # Set the global logging sensitivity to INFO.
     # This captures important events (Logins, Successes, Failures) while ignoring
     # low-level DEBUG noise that would clutter the audit trail.
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.INFO)  # Sets log level to INFO
     
     # Define the output destination (Handler).
-    # sys.stdout directs all log messages to the operator's terminal console.
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stdout)  # Creates a stream handler to stdout
     
     # Create the Log Formatting structure.
     # [TIMESTAMP]: When did it happen? (ISO 8601 format)
     # [NAME]: Which system component reported it?
     # [LEVEL]: How serious is it? (INFO, WARNING, ERROR)
     # [MESSAGE]: What actually happened?
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Creates a formatter with timestamp and level
     
     # Attach the mathematical formatter to the hardware output handler
-    handler.setFormatter(formatter)
+    handler.setFormatter(formatter)  # Applies formatter to handler
     
     # CRITICAL CHECK: Does the logger already have handlers?
     # This prevents the common bug where logs are printed twice or three times
     # if this setup function is called multiple times during the lifecycle.
-    if not logger.handlers:
+    if not logger.handlers:  # Checks if handlers are already present
         # If the list is empty, attach our newly configured handler
-        logger.addHandler(handler)
+        logger.addHandler(handler)  # Adds the handler if missing
         
     # Return the fully configured logger object to the caller
-    return logger
+    return logger  # Returns the configured logger
 
 # Create a GLOBAL SINGLETON instance of the audit log.
 # This allows any module in the project to simply import 'audit_log' and use it.
 # It ensures all parts of the pipeline speak in a consistent format.
-audit_log = setup_logger()
+audit_log = setup_logger()  # Creates the global `audit_log` instance

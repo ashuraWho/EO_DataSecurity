@@ -66,14 +66,14 @@ class IngestionManager:
                 
             # Step 2: Define the "Minimum Viable Metadata" (MVM)
             # RATIONALE: If these keys are missing, our processing engine won't know what to do.
-            required_keys = ["product_id", "timestamp", "sensor"]
+            required_keys = ["product_id", "timestamp", "sensor"]  # Defines `required_keys` list
             
             # Step 3: Check if all mandatory keys exist in the provided file
-            if not all(key in meta for key in required_keys):
+            if not all(key in meta for key in required_keys):  # Verifies all required keys exist
                 # If any are missing, the file is invalid.
-                raise ValueError(f"Missing mandatory fields: {set(required_keys) - set(meta.keys())}")
+                raise ValueError(f"Missing mandatory fields: {set(required_keys) - set(meta.keys())}")  # Raises a ValueError if missing fields
                 
-        except (json.JSONDecodeError, ValueError) as e:
+        except (json.JSONDecodeError, ValueError) as e:  # Starts exception handling
             # Catch bad formatting or missing fields and log the specific reason
             audit_log.error(f"[INGEST] FAILED: Schema validation failed for {product_id}. Error: {e}")
             # STOP the pipeline here. Do not let invalid data proceed.
@@ -85,13 +85,13 @@ class IngestionManager:
         # This is the most critical step for security.
         # We calculate the SHA-256 hash of the binary data at the moment of arrival.
         # RATIONALE: This hash becomes the "Legal Signature" of the file.
-        file_hash = security.calculate_hash(source_file)
+        file_hash = security.calculate_hash(source_file)  # Calculates SHA-256 hash of the data file
         
         # We embed this hash INSIDE the metadata.
         # This "binds" the data file to its metadata record.
-        meta["original_hash"] = file_hash
+        meta["original_hash"] = file_hash  # Stores the hash in metadata
         # Update the status to reflect that it has been checked
-        meta["status"] = "INGESTED"
+        meta["status"] = "INGESTED"  # Sets status to INGESTED
         
         # ---------------------------------------------------------------------
         # PHASE 4: SECURE HANDOVER (Isolation)
@@ -100,24 +100,23 @@ class IngestionManager:
         # RATIONALE: We want to empty the Landing Zone quickly to reduce attack surface.
         
         # Step 1: Ensure the Processing Staging directory exists
-        if not os.path.exists(config.PROCESSING_DIR):
+        if not os.path.exists(config.PROCESSING_DIR):  # Creates processing directory if missing
             os.makedirs(config.PROCESSING_DIR)
             
         # Step 2: Define new destination paths inside the secure boundary
-        dest_file = os.path.join(config.PROCESSING_DIR, f"{product_id}.npy")
-        dest_meta = os.path.join(config.PROCESSING_DIR, f"{product_id}.json")
+        dest_file = os.path.join(config.PROCESSING_DIR, f"{product_id}.npy")  # Builds destination data path
+        dest_meta = os.path.join(config.PROCESSING_DIR, f"{product_id}.json")  # Builds destination metadata path
         
         # Step 3: Physically move the data
-        # shutil.copy() is used here (could use move, but copy allows for easy re-runs in demo)
-        shutil.copy(source_file, dest_file)
+        shutil.copy(source_file, dest_file)  # Copies data file to processing zone
         
         # Step 4: Save the UPDATED metadata (now containing the Source Hash)
-        with open(dest_meta, "w") as f:
+        with open(dest_meta, "w") as f:  # Opens destination metadata file
             # Dump the dictionary back to JSON with clean indentation
-            json.dump(meta, f, indent=4)
+            json.dump(meta, f, indent=4)  # Dumps updated metadata to JSON
             
         # Step 5: Finalize the log for the audit trail
-        audit_log.info(f"[INGEST] SUCCESS: Product {product_id} is verified and staged. Initial Hash: {file_hash}")
+        audit_log.info(f"[INGEST] SUCCESS: Product {product_id} is verified and staged. Initial Hash: {file_hash}")  # Logs ingestion success and hash
         
         # Return the new path so the pipeline can continue to 'Processing'
         return dest_file

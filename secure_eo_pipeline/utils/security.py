@@ -8,7 +8,7 @@ from cryptography.fernet import Fernet
 from secure_eo_pipeline import config
 
 # =============================================================================
-# Security Utilities Module - Line-by-Line Technical Explanation
+# Security Utilities Module
 # =============================================================================
 # PURPOSE:
 # This module acts as the "Cryptographic Engine" for the entire pipeline.
