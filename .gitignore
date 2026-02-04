@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+Thumds.db
+
+# Project-specific artifacts
+simulation_data/
+secret.key
+retrieved_product.npy
+
+# Python virtual environment
+venv/
+.venv/
+env/
+.env/
