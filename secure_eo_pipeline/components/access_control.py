@@ -41,19 +41,18 @@ class AccessController:
         # .get() is safer than direct access because it doesn't crash if the key is missing
         role = config.USERS.get(username)
         
-        # Step 2: Branching logic based on the query result
-        if role:
-            # Case A: User is known. We log a success event.
-            # RATIONALE: Success logs are needed for user activity tracking.
-            audit_log.info(f"[AUTH] SUCCESS: User '{username}' identified as '{role}'.")
-            # Return the role string (e.g., 'admin', 'analyst')
-            return role
-        else:
-            # Case B: User is unknown. This could be a typo or a brute-force attack.
+        # Step 2: Treat missing or explicitly unprivileged roles as authentication failures
+        if not role or role == "none":
+            # Case A: User is unknown or explicitly blocked
             # RATIONALE: Warning logs alert security admins of potential intrusion.
             audit_log.warning(f"[AUTH] FAILURE: Invalid login attempt for '{username}'.")
             # Return None to indicate identity could not be verified
             return None
+        
+        # Case B: User is known and has a valid role. Log success.
+        audit_log.info(f"[AUTH] SUCCESS: User '{username}' identified as '{role}'.")
+        # Return the role string (e.g., 'admin', 'analyst')
+        return role
 
     def authorize(self, username, action):
         """
@@ -74,29 +73,21 @@ class AccessController:
             # Return False to the calling function (Operation Blocked)
             return False
             
-        # Step 3: Check for the 'None' role.
-        # This represents an unprivileged account (like Eve the hacker).
-        if role_name == "none":
-            # Log a warning about an unprivileged access attempt
-            audit_log.warning(f"[ACCESS] DENIED: User '{username}' has no privileges in this system.")
-            # Block the operation
-            return False
-            
-        # Step 4: Map the Role Name to its detailed definition in the config
+        # Step 3: Map the Role Name to its detailed definition in the config
         # This tells us exactly what permissions this role holds.
         role_def = config.ROLES.get(role_name)
         
-        # Step 5: Safety check. If the role exists in USERS but not in ROLES (misconfiguration)
+        # Step 4: Safety check. If the role exists in USERS but not in ROLES (misconfiguration)
         if not role_def:
             # Log a system error
             audit_log.error(f"[ACCESS] CONFIG ERROR: Role '{role_name}' is not defined in the master policy.")
             return False
             
-        # Step 6: Extract the list of allowed actions for this role
+        # Step 5: Extract the list of allowed actions for this role
         # If the 'permissions' key is missing, default to an empty list (Secure Fail)
         permissions = role_def.get("permissions", [])
         
-        # Step 7: The Core Permission Check
+        # Step 6: The Core Permission Check
         # Does the list of allowed permissions contain the requested action?
         if action in permissions:
             # ACCESS GRANTED

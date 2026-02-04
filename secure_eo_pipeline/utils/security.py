@@ -2,7 +2,7 @@
 import os
 # Import hashlib to provide secure hash algorithms like SHA-256 for data integrity checks
 import hashlib
-# Import Fernet from the cryptography library to implement symmetric (AES) encryption
+# Import Fernet from the cryptography library to implement symmetric encryption
 from cryptography.fernet import Fernet
 # Import the local config module to access global settings like file paths and keys
 from secure_eo_pipeline import config
@@ -25,12 +25,12 @@ def generate_key():
     Generates a new 256-bit symmetric encryption key and saves it to a file.
     
     RATIONALE:
-    Symmetric encryption (AES) uses the same key for both locking and unlocking data.
+    Symmetric encryption uses the same key for both locking and unlocking data.
     Generating a fresh, cryptographically secure random key is the first step in
     securing any system.
     """
-    # Use Fernet's built-in generator to create a secure, random 32-byte (256-bit) key
-    # Fernet uses AES in CBC mode with a 128-bit key for encryption and HMAC-SHA256 for authentication.
+    # Use Fernet's built-in generator to create a secure, random key.
+    # Fernet uses AES-128 in CBC mode for encryption and HMAC-SHA256 for authentication.
     key = Fernet.generate_key()
     
     # Open the designated key file path in 'wb' (write binary) mode
@@ -38,6 +38,12 @@ def generate_key():
     with open(config.KEY_PATH, "wb") as key_file:
         # Write the raw bytes of the key into the file
         key_file.write(key)
+    
+    # Tighten file permissions where the OS allows it (best-effort on non-POSIX systems)
+    try:
+        os.chmod(config.KEY_PATH, 0o600)
+    except Exception:
+        pass
     
     # Output a notification to the console for the system operator
     # In a real environment, this would be a high-priority security audit log
@@ -80,13 +86,13 @@ def encrypt_file(file_path):
         file_path (str): The location of the file to be scrambled.
         
     TECHNICAL FLOW:
-    Read Plaintext -> Load Key -> Apply AES Algorithm -> Write Ciphertext
+    Read Plaintext -> Load Key -> Apply Encryption Algorithm -> Write Ciphertext
     """
     # Step 1: Call our internal load_key() to get the secret bytes
     key = load_key()
     
     # Step 2: Initialize the Fernet encryption object with the secret key
-    # This object contains the logic for the AES encryption algorithm
+    # This object contains the logic for the Fernet encryption scheme
     f = Fernet(key)
     
     try:

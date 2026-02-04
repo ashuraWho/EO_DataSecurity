@@ -96,9 +96,21 @@ class ProcessingEngine:
         # PHASE 3: SCIENTIFIC TRANSFORMATION
         # ---------------------------------------------------------------------
         # Simulation: Radiometric Calibration.
-        # We assume the raw data is in 8-bit integers (0-255).
-        # We normalize this to a percentage reflectance (0.0 to 1.0).
-        processed_data = data / 255.0
+        # We normalize raw sensor values into a 0.0 to 1.0 reflectance range.
+        # If the data is already in [0, 1], we keep it as-is.
+        if data.dtype.kind in ("i", "u"):
+            # Integer data (0-255) is scaled to floating reflectance
+            processed_data = data.astype(np.float32) / 255.0
+        else:
+            # Float data: only scale if values exceed the expected reflectance range
+            max_val = float(np.nanmax(data))
+            if max_val > 1.0:
+                processed_data = data / 255.0
+            else:
+                processed_data = data
+        
+        # Clamp the values to a valid range to avoid negative or >1 artifacts
+        processed_data = np.clip(processed_data, 0.0, 1.0)
         
         # Step 1: Overwrite the binary file in the staging area with the NEW processed version.
         np.save(input_file, processed_data)

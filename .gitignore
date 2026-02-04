@@ -1,0 +1,12 @@
+# Runtime data
+simulation_data/
+
+# Secrets
+secret.key
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store

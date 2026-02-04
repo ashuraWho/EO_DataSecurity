@@ -1,18 +1,13 @@
-# Import the os module for interacting with the filesystem (checking files, making directories)
-import os
-# Import json for parsing and updating product metadata
-import json
-# Import shutil for high-level file operations (moving files between security zones)
-import shutil
-# Import the central configuration to access environment paths and roles
-from secure_eo_pipeline import config
-# Import the security utility to calculate the initial integrity hash
-from secure_eo_pipeline.utils import security
-# Import the shared audit log to record ingestion success/failure
-from secure_eo_pipeline.utils.logger import audit_log
+import os  # For filesystem operations
+import json  # For metadata parsing
+import shutil  # For file copying
+
+from secure_eo_pipeline import config  # For directory paths
+from secure_eo_pipeline.utils import security  # For hashing
+from secure_eo_pipeline.utils.logger import audit_log  # For event logging
 
 # =============================================================================
-# Secure Ingestion Component - Line-by-Line Technical Explanation
+# Secure Ingestion Component
 # =============================================================================
 # ROLE IN ARCHITECTURE:
 # The "Border Guard" / "Customs Officer".
@@ -25,12 +20,15 @@ from secure_eo_pipeline.utils.logger import audit_log
 # 3. Secure Handover: Move data from the Landing Zone to the Internal Staging.
 # =============================================================================
 
+
 class IngestionManager:
+    
     """
     Handles the secure intake and validation of newly arrived EO products.
     """
 
     def ingest_product(self, product_id):
+        
         """
         Validates, fingerprints, and registers a product for internal use.
         
@@ -40,30 +38,31 @@ class IngestionManager:
         RETURNS:
             str: The new path to the ingested file, or None if validation fails.
         """
+        
         # Step 1: Log the start of the ingestion request
-        audit_log.info(f"[INGEST] START: Received ingestion request for product {product_id}")
+        audit_log.info(f"[INGEST] START: Received ingestion request for product {product_id}")  # Logs start of ingestion
         
         # Step 2: Define expected source paths in the Landing Zone (Untrusted)
-        source_file = os.path.join(config.INGEST_DIR, f"{product_id}.npy")
-        source_meta = os.path.join(config.INGEST_DIR, f"{product_id}.json")
+        source_file = os.path.join(config.INGEST_DIR, f"{product_id}.npy")  # Builds the data file path
+        source_meta = os.path.join(config.INGEST_DIR, f"{product_id}.json")  # Builds the metadata file path
         
         # ---------------------------------------------------------------------
         # PHASE 1: EXISTENCE VALIDATION
         # ---------------------------------------------------------------------
         # Check: Did both the binary data AND the metadata file arrive?
-        if not os.path.exists(source_file) or not os.path.exists(source_meta):
+        if not os.path.exists(source_file) or not os.path.exists(source_meta):  # Checks for both data and metadata files
             # Log a critical failure if part of the product is missing
-            audit_log.error(f"[INGEST] FAILED: Incomplete product. Missing files for {product_id}.")
-            return None
+            audit_log.error(f"[INGEST] FAILED: Incomplete product. Missing files for {product_id}.")  # Logs missing file error
+            return None  # Returns None to stop ingestion
             
         # ---------------------------------------------------------------------
         # PHASE 2: SCHEMA VALIDATION (Content Integrity)
         # ---------------------------------------------------------------------
         # We must ensure the metadata isn't "poisoned" or malformed.
-        try:
+        try:  # Starts a try block for JSON parsing
             # Step 1: Open and parse the JSON metadata
-            with open(source_meta, "r") as f:
-                meta = json.load(f)
+            with open(source_meta, "r") as f:  # Opens metadata file
+                meta = json.load(f)  # Parses JSON into `meta`
                 
             # Step 2: Define the "Minimum Viable Metadata" (MVM)
             # RATIONALE: If these keys are missing, our processing engine won't know what to do.
