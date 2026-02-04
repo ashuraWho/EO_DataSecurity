@@ -1,161 +1,119 @@
-# Secure & Resilient Earth Observation Data Pipeline
-
-**OFFICIAL PROJECT MANUAL**
-
-| **Project Metadata** | |
-| :--- | :--- |
-| **Project Name** | Secure EO Data Pipeline Prototype |
-| **Domain** | Space Systems / Ground Segment Engineering |
-| **Focus Area** | Cyber Security, Data Integrity, Operational Resilience |
-| **Target Audience** | ESA Trainees, Systems Engineers, Security Auditors |
-| **Implementation Language** | Python 3.x |
-| **Key Standards** | ISO 27000 Series (Information Security), CCSDS (Space Data Systems) |
+# Secure & Resilient Earth Observation (EO) Data Pipeline
+## **OFFICIAL TECHNICAL & OPERATIONAL MANUAL**
 
 ---
 
-## **1. Executive Summary**
+## **1. Introduction & Mission Context**
 
-This project serves as a **functional prototype** and **architectural reference** for a secure Earth Observation (EO) data handling system. In the context of modern ESA missions (like Copernicus Sentinel), data is not just "scientific output"; it is a critical asset that requires protection against:
-1.  **Unauthorized Access** (Confidentiality Breaches).
-2.  **Data Corruption/Tampering** (Integrity Violations).
-3.  **System Failures/Data Loss** (Availability Threats).
+### **1.1. Project Overview**
+The **Secure EO Pipeline** is a high-fidelity functional prototype designed to simulate the ground segment of a modern satellite mission (e.g., ESA's Copernicus Sentinel series). In these missions, data is more than just scientific information—it is a critical geopolitical and environmental asset. This system demonstrates how to protect that asset from its arrival on Earth until its final delivery to scientists.
 
-This prototype simulates the entire lifecycle of a satellite product—from the moment it is received on the ground to its long-term archiving and retrieval—demonstrating how **Security-by-Design** principles are implemented in code.
-
----
-
-## **2. Detailed System Architecture**
-
-The system is architected as a modular pipeline, where each stage represents a distinct "Zone of Trust".
-
-### **2.1. The Pipeline Components**
-
-| Component | Responsibility | Security Control Implemented |
-| :--- | :--- | :--- |
-| **1. Data Source** | Simulates the satellite instrument (e.g., MSI on Sentinel-2). | *N/A (Source of inputs)* |
-| **2. Ingestion** | The "Border Control". Receives external data. | **Schema Validation** (Is it valid JSON?) & **Baselining** (Calculate initial SHA-256 Hash). |
-| **3. Processing** | Transforms raw L0 data to L1 science products. | **Provenance Tracking** (Updates metadata to link input -> output) & **QC** (Checks for corruption). |
-| **4. Archiving** | The "Vault". Stores data for the long term. | **Encryption-at-Rest** (AES-256) ensures files are unreadable if the disk is stolen. |
-| **5. Resilience** | The "Safety Net". Backups and Recovery. | **Redundancy** (Copy to separate location) & **Self-Healing** (Auto-restore on corruption). |
-| **6. Access Control** | The "Gatekeeper". Manages user rights. | **RBAC** (Role-Based Access Control) to enforce Least Privilege. |
-
-### **2.2. Data Flow Diagram**
-
-```
-[ SPACE SEGMENT ]              [ GROUND SEGMENT ]
-       |
-       v
-(1) Raw Signal  ----->  [ INGESTION ZONE ] 
-                        (Validate Format, Calc Hash)
-                                |
-                                v
-                        [ PROCESSING ZONE ]
-                        (Calibrate, QC Check)
-                                |
-                                v
-                        [ SECURE ARCHIVE ]
-                        (Encrypt with AES-256)  <====> [ BACKUP VAULT ]
-                                |
-                                v
-                        [ ACCESS GATEWAY ]
-                        (Authenticate & Decrypt)
-                                |
-                                v
-                         [ END USER ]
-```
+### **1.2. The Three Pillars of Data Security**
+This project is built around the "CIA Triad," the foundational model for information security:
+1.  **Confidentiality**: Ensuring only authorized personnel can view the satellite images (Implemented via **AES-256 Encryption**).
+2.  **Integrity**: Ensuring the data hasn't been modified by hackers or hardware errors (Implemented via **SHA-256 Hashing**).
+3.  **Availability**: Ensuring the data is always accessible, even after a disaster (Implemented via **Automated Redundancy & Self-Healing**).
 
 ---
 
-## **3. Security Mechanisms Explained**
+## **2. System Architecture**
 
-This section explains the *theory* behind the implementation choices.
+The pipeline is organized into distinct "Zones of Trust," mirroring the architecture of professional ground segments.
 
-### **3.1. Cryptography (Confidentiality)**
-*   **Algorithm Used**: AES (Advanced Encryption Standard) in CBC mode (via Ferrnet).
-*   **Why AES?**: It is the industry standard for symmetric encryption. It is fast enough to encrypt gigabytes of EO data without slowing down the pipeline.
-*   **Key Management**: The system generates a `secret.key`. In this prototype, it is a file. In operations, this would be inside a Hardware Security Module (HSM).
-*   **Implementation**: See `utils/security.py`.
+### **2.1. Logic Flow (The Lifecycle)**
+1.  **Landing Zone (Ingest)**: Unfiltered data arrives. It is considered "Untrusted."
+2.  **Secure Processing Zone**: Data is verified and transformed into Level-1 products.
+3.  **Encrypted Vault (Archive)**: Products are scrambled with a secret key and stored long-term.
+4.  **Resilience Layer (Backup)**: A mirrored copy is kept to repair potential corruption.
+5.  **Access Gateway**: Authentication and Role-Based Access Control (RBAC) manage user retrieval.
 
-### **3.2. Hashing (Integrity)**
-*   **Algorithm Used**: SHA-256 (Secure Hash Algorithm 256-bit).
-*   **Why?**: A hash acts as a "Digital Fingerprint". If even a single bit of a 10GB satellite image changes (due to cosmic radiation or a hacker), the SHA-256 hash changes completely.
-*   **Workflow**:
-    1.  Calculate Hash immediately upon arrival (Ingestion).
-    2.  Store this Hash in the metadata (JSON).
-    3.  Periodically recalculate the file's Hash and compare it to the metadata. Mismatch = Corruption.
-
-### **3.3. Role-Based Access Control (Governance)**
-*   **Why?**: Managing permissions for 1000 users individually is impossible. We assign permissions to **Roles** (Admin, Analyst, User).
-*   **The Roles**:
-    *   **Admin**: Can Manage Keys, Recover Data. (High Trust)
-    *   **Analyst**: Can Process Data. (Medium Trust)
-    *   **User**: Can only Read. (Low Trust)
-*   **Implementation**: See `config.py` definitions and `components/access_control.py` logic.
+### **2.2. Directory Structure**
+- `secure_eo_pipeline/`: The core engine.
+  - `components/`: Business logic for Ingestion, Processing, and Storage.
+  - `utils/`: Low-level cryptographic and logging tools.
+  - `resilience/`: Self-healing and backup logic.
+- `main_demo.py`: Automated end-to-end demonstration.
+- `main_interactive.py`: Full-featured CLI for manual operations.
+- `simulation_data/`: (Generated at runtime) Local database containing all files.
 
 ---
 
-## **4. Operational Manual**
+## **3. Technical Deep-Dive: Security Mechanisms**
+
+### **3.1. Cryptography (AES-256)**
+We utilize **Fernet (Symmetric Encryption)**, which is built on top of AES in CBC mode with 128-bit blocks.
+- **Why?**: AES is the global standard used by governments. It provides high performance and unbeatable security.
+- **Key Management**: The system generates a `secret.key`. In a real mission, this key would reside in an HSM (Hardware Security Module), physically inaccessible to software.
+
+### **3.2. Data Integrity (SHA-256)**
+Every file is "fingerprinted" using the Secure Hash Algorithm 256.
+- **The Avalanche Effect**: If even 1 bit of a 100MB file changes, the entire hash string changes completely.
+- **Chain of Custody**: We calculate the hash at Ingestion and Processing, storing them in the metadata to ensure the file remains authentic throughout its life.
+
+### **3.3. Role-Based Access Control (RBAC)**
+Instead of individual permissions, we use a role hierarchy:
+- **Admin**: Has 'God-Mode' rights. Can manage encryption keys and trigger recovery.
+- **Analyst**: Can process data and perform Quality Control.
+- **User**: Read-only access to final products.
+- **Intruder**: No credentials (simulation of a failed breach).
+
+---
+
+## **4. Operational Guide**
 
 ### **4.1. Installation**
-Prerequisites: Python 3.8+.
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-```
+1.  Ensure Python 3.8+ is installed.
+2.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-### **4.2. Mode 1: Automated Demonstration**
-Best for initial validation or presenting to stakeholders.
+### **4.2. Running the Automated Demo**
+This is the best way to see the system in action without typing commands.
 ```bash
 python main_demo.py
 ```
-**What happens:**
-1.  **Scenario 1 (Happy Path)**: The system generates a file, processes it, encrypts it, and lets an Admin read it. All green checks.
-2.  **Scenario 2 (Intrusion)**: A user "Eve" tries to read a file. The system denies access.
-3.  **Scenario 3 (Disaster Recovery)**: The script intentionally corrupts a file on disk. The Resilience Manager detects the hash mismatch and restores the file from backup automatically.
+**Watch for these Scenarios:**
+- **The Happy Path**: Success from satellite to user.
+- **The Security Breach**: Watch the RBAC system block `eve_hacker`.
+- **The Self-Healing**: Watch the system detect a corrupted file and restore it from backup.
 
-### **4.3. Mode 2: Interactive Console**
-Best for training operators or exploring the system logic yourself.
+### **4.3. Using the Interactive Console**
+For manual control and training, use the interactive CLI.
 ```bash
 python main_interactive.py
 ```
-**Commands:**
-*   `scan`: Triggers the `data_source` to create a new random product.
-*   `ingest`: Moves the product from Landing Zone to Processing, validating it.
-*   `process`: Runs the L0->L1 mathematics.
-*   `archive`: Encrypts the file and moves it to the Secure Archive.
-*   `hack`: **(Simulation)** Corrupts the encrypted file on the hard drive.
-*   `recover`: Runs the integrity check and restores from backup if needed.
-*   `login`: Switch users (e.g., `alice_admin`, `eve_hacker`).
+**Workflow to test the system:**
+1.  `scan`: Find a signal.
+2.  `login`: Login as `emanuele_admin`.
+3.  `ingest`: Secure the data.
+4.  `process`: Create the L1 product.
+5.  `archive`: Encrypt and vault the product.
+6.  `hack`: Intentionally corrupt the data on the disk!
+7.  `recover`: Watch the system heal the corruption using the backup.
 
 ---
 
-## **5. File Structure & Code Guide**
+## **5. Troubleshooting & FAQ**
 
-A quick map of the codebase for developers.
+**Q: Where is my data saved?**
+A: Everything is inside the `simulation_data/` folder. You can safely delete this folder to reset the entire simulation.
 
-*   **`main_demo.py`**: The "movie script" that runs the auto-demo.
-*   **`main_interactive.py`**: The "video game" CLI for manual control.
-*   **`simulation_data/`**: **(Generated Runtime Folder)**.
-    *   This folder appears when you run the scripts. 
-    *   It contains the simulated satellite files (`.npy`, `.json`, `.enc`) and backups.
-    *   **Safe to Delete**: The scripts will automatically recreate it if missing.
-*   **`secure_eo_pipeline/`**: The main package.
-    *   **`config.py`**: **READ THIS FIRST**. Contains all directory paths, user accounts, and role definitions.
-    *   **`utils/`**:
-        *   `security.py`: The crypto engine (Hash/Encrypt/Decrypt).
-        *   `logger.py`: The centralized audit logging tool.
-    *   **`components/`**:
-        *   `data_source.py`: Simulates the satellite.
-        *   `ingestion.py`: Handles validation and initial hashing.
-        *   `processing.py`: Handles data transformation and QC.
-        *   `storage.py`: Handles encryption and file storage.
-        *   `access_control.py`: The logic for RBAC (AuthN/AuthZ).
-    *   **`resilience/`**:
-        *   `backup_system.py`: The logic for backup replication and self-healing.
+**Q: What happens if I lose the `secret.key`?**
+A: In this system, and in real life, the data is lost forever. AES encryption is "mathematically perfect" and cannot be bypassed without the key.
+
+**Q: Why do I see so many log lines?**
+A: Every action is recorded in the **Audit Log**. This is a legal requirement for satellite missions to provide "Non-Repudiation" (proving who did what).
 
 ---
 
-## **6. Conclusion**
+## **6. Advanced Configuration**
+You can modify the system behavior in `secure_eo_pipeline/config.py`:
+- Change user roles.
+- Add new permissions.
+- Change the directory names.
 
-This system demonstrates that **Security is not an add-on; it is a process.** 
-By integrating validation, encryption, and hashing into the very lifecycle of the data, we ensure that ESA missions can trust the scientific data they produce, even in the face of cyber threats or hardware failures.
+---
+**Author**: Emanuele Anzellotti / Jules AI
+**Version**: 1.0.0
+**Target**: ESA Ground Segment Security Prototype

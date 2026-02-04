@@ -1,8 +1,10 @@
-# Import standard python libraries
+# Import standard python libraries for system-level operations and timing
 import sys
+# os is used for checking file existence and managing paths
 import os
+# time is used to insert realistic delays into the demonstration flow
 import time
-# Import Rich library for UI (Panels, Tables, Progress Bars)
+# Import components from the Rich library to create a beautiful and professional terminal UI
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -10,35 +12,36 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich import print as rprint
 from rich.style import Style
 
-# Project Imports - These are the modules we wrote!
-# Import configuration (paths, keys)
+# PROJECT IMPORTS - Bringing in the secure pipeline architecture we built
+# Import configuration (directories, roles, user database)
 from secure_eo_pipeline import config
-# Component: Simulates data source
+# Component: EOSimulator (Simulates the satellite's instrument output)
 from secure_eo_pipeline.components.data_source import EOSimulator
-# Component: Handles Ingestion
+# Component: IngestionManager (Validates incoming data at the ground station)
 from secure_eo_pipeline.components.ingestion import IngestionManager
-# Component: Handles Processing
+# Component: ProcessingEngine (Transforms raw signals into scientific products)
 from secure_eo_pipeline.components.processing import ProcessingEngine
-# Component: Handles Archive/Encryption
+# Component: ArchiveManager (Handles AES encryption and long-term storage)
 from secure_eo_pipeline.components.storage import ArchiveManager
-# Component: Handles Authentication
+# Component: AccessController (Enforces Identity & Role-Based Access Control)
 from secure_eo_pipeline.components.access_control import AccessController
-# Component: Handles Backup/Resilience
+# Component: ResilienceManager (Handles automated backups and self-healing)
 from secure_eo_pipeline.resilience.backup_system import ResilienceManager
-# Utility: Security/Integrity functions
+# Utility: security (Provides the low-level crypto and hashing algorithms)
 from secure_eo_pipeline.utils import security
 
-# Initialize Rich Console (The UI manager)
+# Initialize the Rich Console - This is our global UI manager
 console = Console()
 
 # =============================================================================
-# Helper Functions for UI (Visualization Logic)
+# UI HELPER FUNCTIONS - Making the demonstration readable
 # =============================================================================
 
 def print_header(title, subtitle):
     """
-    Draws a big fancy header box at the start of a scenario.
+    Renders a styled header panel at the start of each demonstration scenario.
     """
+    # Create a panel that fits the content width
     console.print(Panel.fit(
         f"[bold white]{subtitle}[/bold white]",
         title=f"[bold cyan]{title}[/bold cyan]",
@@ -48,51 +51,56 @@ def print_header(title, subtitle):
 
 def print_step(step_num, description, color="blue"):
     """
-    Prints a uniform section header (Step 1, Step 2, etc).
+    Displays a standardized step header to track pipeline progress.
     """
+    # Print the step number in the chosen color and the description
     console.print(f"\n[bold {color}]Step {step_num}:[/bold {color}] {description}")
 
 def print_status(component, status, details, success=True):
     """
-    Prints a status table row showing success/failure state.
-    This creates the nice 'Component | Status | Details' output.
+    Renders a status row in a table format to show if a component succeeded or failed.
     """
-    # Determine color: Green for good, Red for bad
+    # Use green for success and red for failure to provide immediate visual feedback
     color = "green" if success else "red"
-    # Choose icon
+    # Choose the appropriate icon for the status
     symbol = "✅" if success else "❌"
     
-    # Create a borderless table
+    # Create a minimalist, borderless table for alignment
     table = Table(show_header=False, box=None)
+    # Define columns with fixed widths for a consistent look
     table.add_column("Component", style="bold white", width=15)
     table.add_column("Status", style=color, width=10)
     table.add_column("Details", style="dim white")
     
-    # Add the data row
+    # Insert the status information as a row
     table.add_row(f"[{component}]", f"{symbol} {status}", details)
+    # Output the table to the terminal
     console.print(table)
 
 def print_explanation(text):
     """
-    Prints a user-friendly 'Beginner Mode' explanation box.
-    Explains the 'Why', not just the 'What'.
+    Prints a dim, italicized box explaining the 'Security Rationale' of a step.
+    This helps beginners understand WHY the code is doing what it's doing.
     """
+    # Prefix with an information icon and use a subtle style
     console.print(f"[dim white italic]   ℹ {text}[/dim white italic]\n")
 
 # =============================================================================
-# SCENARIO 1: THE HAPPY PATH
+# SCENARIO 1: THE HAPPY PATH (NOMINAL OPERATIONS)
 # =============================================================================
 # GOAL:
-# Demonstrate the system working exactly as designed from end-to-end.
-# Flow: Source -> Ingest -> Process -> Archive -> Backup -> User Access
+# Walk the user through a perfect end-to-end data lifecycle.
+# Lifecycle: Acquisition -> Ingestion -> Processing -> Archiving -> Backup -> Access.
 # =============================================================================
 
 def run_scenario_1_happy_path():
-    # Clear screen for fresh start
+    # Step 1: Clear the terminal to focus the user's attention
     console.clear()
+    # Step 2: Show the scenario introduction
     print_header("SCENARIO 1", "Nominal Operations (Happy Path)\nGoal: Ingest -> Process -> Archive -> Access")
     
-    # Initialize all our System Components
+    # Step 3: Instantiate all System Components
+    # We create local instances of each class to use their methods
     source = EOSimulator()
     ingest = IngestionManager()
     processor = ProcessingEngine()
@@ -100,42 +108,44 @@ def run_scenario_1_happy_path():
     ac = AccessController()
     backup = ResilienceManager()
     
-    # Define a unique Product ID for this run
+    # Step 4: Define a unique Product ID for this simulation run
     pid = "Sentinel_2_T32TQC_DEMO"
     
-    # --- Step 1: Generation ---
+    # --- STEP 1: GENERATION ---
     print_step(1, "Satellite Data Acquisition (Simulation)", "cyan")
-    print_explanation("We simulate a satellite (like Sentinel-2) capturing an image of Earth.\n   At this stage, it's just raw digital signals (ones and zeros) being beamed down to Earth.")
+    print_explanation("We simulate a satellite capturing an image. At this stage, it's just raw digital signals.")
     
-    # Show loading spinner
+    # Use a Rich status spinner to simulate the time it takes for a downlink
     with console.status("[bold cyan]Simulating satellite downlink...", spinner="earth"):
-        time.sleep(1.5) # Fake delay
+        time.sleep(1.5) # Artificial pause for realism
         source.generate_product(pid)
         
+    # Report that the data has been created successfully
     print_status("DATA SOURCE", "GENERATED", f"Product ID: {pid}", success=True)
     
-    # --- Step 2: Ingestion ---
+    # --- STEP 2: INGESTION ---
     print_step(2, "Secure Ingestion & Validation", "cyan")
-    print_explanation("The data lands at our ground station.\n   Think of this as 'Border Control'. We immediately check:\n   1. Is the file format correct?\n   2. Is the passport (metadata) valid?\n   3. We take a 'digital fingerprint' (Hash) to ensure no one changes it later.")
+    print_explanation("The 'Border Control' check. We validate formats and take a SHA-256 fingerprint (Hash).")
     
     with console.status("[bold cyan]Ingesting product...", spinner="dots"):
-        time.sleep(1)
-        # Call the actual ingestion logic
+        time.sleep(1) # Fake processing time
+        # Call the actual ingestion component we built
         ingested_path = ingest.ingest_product(pid)
     
+    # Check if the ingestion logic returned a valid path (success) or None (failure)
     if ingested_path:
         print_status("INGESTION", "VALIDATED", "Format OK | Schema OK | Hash Calculated", success=True)
     else:
         print_status("INGESTION", "FAILED", "Validation Failed", success=False)
-        return # Stop if failed
+        return # Exit the scenario early on failure
     
-    # --- Step 3: Processing ---
+    # --- STEP 3: PROCESSING ---
     print_step(3, "Processing & Quality Control (L0 -> L1)", "cyan")
-    print_explanation("Raw data is hard to read. We process it to make it useful (Level-1).\n   Crucially, we check for errors (Quality Control). If the data is garbage (e.g., sensor error), we reject it here so it doesn't pollute the archive.")
+    print_explanation("Raw data is calibrated into science products. We check for 'NaN' values (sensor errors).")
     
     with console.status("[bold cyan]Processing L0 -> L1...", spinner="dots"):
-        time.sleep(1.5)
-        # Call processing logic
+        time.sleep(1.5) # Fake heavy computation delay
+        # Call the processing engine
         processed_path = processor.process_product(pid)
     
     if processed_path:
@@ -144,80 +154,93 @@ def run_scenario_1_happy_path():
         print_status("PROCESSING", "QC FAILED", "Data Corruption Detected", success=False)
         return
     
-    # --- Step 4: Archiving ---
+    # --- STEP 4: ARCHIVING ---
     print_step(4, "Secure Storage (Encryption at Rest)", "cyan")
-    print_explanation("Now we store the valuable processed data.\n   We use AES Encryption (like a digital safe). If a hacker steals the hard drive,\n   all they will see is scrambled noise. Only the key can unlock it.")
+    print_explanation("We use AES-256 encryption. Even if the disk is stolen, the data is unreadable.")
     
     with console.status("[bold cyan]Encrypting...", spinner="dots"):
-        time.sleep(1)
-        # Call archiving logic (Encryption happens here)
+        time.sleep(1) # Fake encryption delay
+        # Call the archiving manager to encrypt and vault the file
         archived_path = archive.archive_product(pid)
         
     print_status("ARCHIVE", "SECURED", "File Encrypted (AES) | Stored", success=True)
     
-    # --- Step 5: Backup ---
+    # --- STEP 5: BACKUP ---
     print_step(5, "Resilience Layer (Backup)", "cyan")
-    print_explanation("Hard drives fail. Buildings catch fire. \n   To be 'Resilient', we immediately make a copy to a separate secure location.\n   This ensures Availability.")
+    print_explanation("To ensure 'Availability', we immediately clone the encrypted data to a backup zone.")
     
-    # Create the backup
+    # Execute the backup replication
     backup.create_backup(pid)
     print_status("BACKUP", "REPLICATED", "Copy created in Backup Zone", success=True)
     
-    # --- Step 6: Access ---
+    # --- STEP 6: ACCESS ---
     print_step(6, "User Access & Delivery", "cyan")
-    user = "alice_admin"
-    print_explanation(f"User '{user}' wants the file.\n   The system checks her ID card (Authentication) and her permissions (Authorization).\n   Since she is an Admin, we decrypt the file just for her.")
+    # Simulate an administrator user
+    user = "emanuele_admin"
+    print_explanation(f"User '{user}' requests access. We check Authentication and Authorization before decrypting.")
     
-    # Check permission
+    # Call the Access Controller to verify if this user is allowed to 'read'
     if ac.authorize(user, "read"):
         print_status("ACCESS CONTROL", "AUTHORIZED", f"Role '{config.USERS[user]}' permitted", success=True)
-        # Retrieve and Decrypt
+        # Define the local filename for the delivered product
         outfile = "retrieved_product.npy"
         with console.status("[bold green]Decrypting and delivering product...", spinner="dots"):
-            time.sleep(1)
+            time.sleep(1) # Fake decryption delay
+            # Fetch, decrypt, and deliver the file
             archive.retrieve_product(pid, outfile)
         
+        # Report delivery success
         print_status("DELIVERY", "SUCCESS", f"Decrypted to {outfile}", success=True)
-        # Cleanup the delivered file to keep folder clean
+        # CLEANUP: Remove the delivered file so we don't clutter the user's workspace
         if os.path.exists(outfile): os.remove(outfile) 
     else:
         print_status("ACCESS CONTROL", "DENIED", "Insufficient Permissions", success=False)
 
+    # Display a final success banner
     console.print(Panel("[bold green]SCENARIO 1 COMPLETED SUCCESSFULLY[/bold green]", border_style="green"))
 
 
 # =============================================================================
-# SCENARIO 2: UNAUTHORIZED ACCESS
+# SCENARIO 2: UNAUTHORIZED ACCESS (SECURITY BREACH)
 # =============================================================================
 # GOAL:
-# Demonstrate RBAC blocking a hacker.
+# Prove that our Role-Based Access Control (RBAC) stops hackers.
 # =============================================================================
 
 def run_scenario_2_unauthorized_access():
+    # Insert vertical spacing
     print("\n\n")
+    # Show the scenario header
     print_header("SCENARIO 2", "Security Breach Attempt\nGoal: Block unauthorized user accessing Archive")
     
+    # Initialize the Access Controller component
     ac = AccessController()
+    # Define the intruder identity
     hacker = "eve_hacker"
     
-    # --- Step 1: Login Try ---
+    # --- STEP 1: LOGIN ---
     print_step(1, "Authentication Attempt", "red")
-    print_explanation(f"An unknown user '{hacker}' tries to log in.\n   Imagine a stranger trying to enter a secure facility without a badge.")
+    print_explanation(f"User '{hacker}' attempts to log in to the system.")
     
-    ac.authenticate(hacker) # This will log a warning
+    # Attempt to authenticate (this will log a warning in the audit trail)
+    ac.authenticate(hacker) 
     
-    # --- Step 2: Access Try ---
+    # --- STEP 2: ACCESS ---
     print_step(2, "Authorization Check", "red")
-    print_explanation(f"'{hacker}' tries to grab a sensitive file.\n   The system checks the Access Control List (ACL). She is NOT on the list.\n   The door remains locked.")
+    print_explanation(f"'{hacker}' tries to read a sensitive product. The system blocks her.")
     
-    # Try to authorize
+    # Attempt to authorize the 'read' action
     authorized = ac.authorize(hacker, "read")
     
+    # Branching logic based on security result
     if authorized:
+        # This branch should never be reached in a secure system
         print_status("SECURITY", "BREACHED", "CRITICAL FAILURE: Unauthorized access granted!", success=False)
     else:
+        # Success: The system blocked the unauthorized user
          print_status("ACCESS CONTROL", "BLOCKED", f"User '{hacker}' has NO PERMISSIONS. Access Denied.", success=True)
          
+    # Show the scenario completion banner
     console.print(Panel("[bold green]SCENARIO 2 COMPLETED: SYSTEM SECURE[/bold green]", border_style="green"))
 
 
@@ -225,23 +248,27 @@ def run_scenario_2_unauthorized_access():
 # SCENARIO 3: RESILIENCE (SELF-HEALING)
 # =============================================================================
 # GOAL:
-# Demonstrate detection of corruption (Simulated Hack) and restoration from backup.
+# Demonstrate how the system detects and repairs "Bit Rot" or data corruption.
 # =============================================================================
 
 def run_scenario_3_resilience():
+    # Insert vertical spacing
     print("\n\n")
+    # Show the scenario header
     print_header("SCENARIO 3", "Data Integrity & Recovery\nGoal: Detect bit-rot/corruption and auto-heal")
     
+    # Define a test product ID
     pid = "Resilience_Test_Product"
     
-    # Re-initialize components
+    # Re-initialize all necessary components
     source = EOSimulator()
     ingest = IngestionManager()
     processor = ProcessingEngine()
     archive = ArchiveManager()
     backup = ResilienceManager()
     
-    # --- Setup Phase (Fast Forward) ---
+    # --- FAST-FORWARD SETUP ---
+    # We automatically perform the ingest -> process -> archive -> backup steps
     console.print("[dim]Setting up: Creating valid product and backup...[/dim]")
     source.generate_product(pid)
     ingest.ingest_product(pid)
@@ -249,57 +276,70 @@ def run_scenario_3_resilience():
     archived_path = archive.archive_product(pid)
     backup.create_backup(pid)
     
-    # Capture the "Good" Hash for verification later
+    # Capture the "Healthy" Hash from the file for our reference
     good_hash = security.calculate_hash(archived_path)
     console.print(f"[green]Original Healthy Hash: {good_hash}[/green]")
     
-    # --- Step 1: Attack (Corruption) ---
-    print_step(1, "Simulating Cyber/Physical Attack", "red")
-    print_explanation("We simulate a disk failure or a cyber-attack.\n   We are intentionally writing garbage data over the good file.\n   This represents 'Bit Rot' or data corruption.")
+    # --- STEP 1: ATTACK (CORRUPTION) ---
+    print_step(1, "Simulating Physical Data Corruption", "red")
+    print_explanation("We intentionally write garbage data to the encrypted file. This simulates hardware failure.")
     
+    # Visual alert
     console.print(Panel("[bold red]ALERT: DATA CORRUPTION INJECTED[/bold red]\nWriting garbage bytes to the primary storage disk...", border_style="red"))
     
-    # Manually overwrite the file with junk
+    # Step 1: Open the encrypted file and overwrite it with junk bytes
     with open(archived_path, "wb") as f:
-        f.write(b"CORRUPTED_DATA_BLOCK_000000")
+        f.write(b"CORRUPTED_DATA_BLOCK_X_000")
     
-    # Verify it is bad
+    # Step 2: Recalculate the hash to prove it has changed
     bad_hash = security.calculate_hash(archived_path)
-    console.print(f"[red]Corrupted Hash:        {bad_hash}[/red]")
+    console.print(f"[red]Corrupted Hash (Now):  {bad_hash}[/red]")
     
-    # --- Step 2: Recovery ---
-    print_step(2, "System Integrity Verification", "blue")
-    print_explanation("Our automated 'Health Check' process scans the file.\n   It compares the current fingerprint (Hash) with the original one.\n   They don't match! The system realizes the file is broken.")
+    # --- STEP 2: RECOVERY ---
+    print_step(2, "System Integrity Verification & Healing", "blue")
+    print_explanation("The system runs a health check, finds the mismatch, and pulls the backup.")
     
-    # Helper to mimic the system knowing what the hash 'should' be
+    # Define a helper function to simulate a secure Hash Catalog
     def get_expected_hash(p):
-        return good_hash
+        return good_hash # Returns the hash we saved earlier
     
-    # Trigger Auto-Recovery
-    with console.status("[bold red]integrity check running...", spinner="weather"):
-        time.sleep(1)
+    # Trigger the Resilience Manager's verification and restoration logic
+    with console.status("[bold red]Integrity check running...", spinner="weather"):
+        time.sleep(1) # Fake audit time
+        # This will detect the error and restore from backup automatically
         recovered = backup.verify_and_restore(pid, expected_hash_fn=get_expected_hash)
     
+    # Step 3: Verify the outcome
     if recovered:
+         # Log the successful healing
          print_status("RESILIENCE", "RECOVERED", "Corruption detected -> Backup Restored", success=True)
-         print_explanation("Result: The system automatically fetched the good copy from the Backup.\n   The user never even knew there was a problem. This is 'Resilience'.")
+         print_explanation("The system automatically repaired itself using the backup. The user is unaffected.")
     
-    # Verify the file is good again
+    # Step 4: Final Integrity Check
     final_hash = security.calculate_hash(archived_path)
-    # Check if we back to the start
+    # If the hash is back to the 'Good' one, we are fully restored
     if final_hash == good_hash:
          console.print(Panel("[bold green]SCENARIO 3 COMPLETED: SELF-HEALING SUCCESSFUL[/bold green]", border_style="green"))
 
-# Entry point
+# =============================================================================
+# MAIN ENTRY POINT
+# =============================================================================
+
 if __name__ == "__main__":
-    # Ensure a clean state (Remove old data)
+    # Step 1: Clean start - Remove any old data from previous runs
     if os.path.exists("simulation_data"):
+        # Import and use rmtree to delete the entire directory tree
         import shutil
         shutil.rmtree("simulation_data")
         
-    # Run Scenarios in order
+    # Step 2: Execute the scenarios in sequence
+    # Run Scenario 1: Nominal Flow
     run_scenario_1_happy_path()
-    time.sleep(2)
+    time.sleep(2) # Pause so the user can read the success message
+    
+    # Run Scenario 2: Security check
     run_scenario_2_unauthorized_access()
     time.sleep(2)
+    
+    # Run Scenario 3: Recovery check
     run_scenario_3_resilience()

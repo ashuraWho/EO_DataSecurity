@@ -1,56 +1,54 @@
+# Import the standard sys module for system-specific parameters and functions (like exit)
 import sys
-# Used for system-level operations like exit
+# Import the os module for interacting with the operating system (files, directories)
 import os
-# Used to interact with the Operating System (files, paths)
+# Import time to add realistic delays into the command execution flow
 import time
-# Used for delays to simulate real-world processing time
+# Import random to generate unpredictable product identifiers
 import random
-# Used to generate random product IDs
+# Import components from the Rich library to build a modern terminal user interface
 from rich.console import Console
-# Rich library: Provides the main terminal output interface
 from rich.panel import Panel
-# Rich library: Creates styled boxes/panels
 from rich.table import Table
-# Rich library: Creates organized data tables
 from rich.prompt import Prompt
-# Rich library: Handles user input nicely
 from rich.layout import Layout
 from rich.live import Live
 
-# Import our project configuration (paths, users, roles)
+# Import the project's central configuration settings
 from secure_eo_pipeline import config
-# Import the Component that simulates satellite data generation
+# Import the Satellite Simulator component
 from secure_eo_pipeline.components.data_source import EOSimulator
-# Import the Component that handles secure data ingestion
+# Import the Secure Ingestion component
 from secure_eo_pipeline.components.ingestion import IngestionManager
-# Import the Component that processes data (L0 -> L1)
+# Import the L0->L1 Processing component
 from secure_eo_pipeline.components.processing import ProcessingEngine
-# Import the Component that manages the secure archive (Encryption)
+# Import the Encrypted Archive component
 from secure_eo_pipeline.components.storage import ArchiveManager
-# Import the Component that checks permissions (RBAC)
+# Import the RBAC Access Controller component
 from secure_eo_pipeline.components.access_control import AccessController
-# Import the Component that handles backups and recovery
+# Import the Resilience and Backup component
 from secure_eo_pipeline.resilience.backup_system import ResilienceManager
-# Import security utilities (hashing, etc.)
+# Import cryptographic and hashing utilities
 from secure_eo_pipeline.utils import security
 
-# Instantiate the Global Console object for printing
+# Instantiate a global Rich Console for all printing operations
 console = Console()
 
 class InteractiveSession:
     """
-    Manages the state and flow of the interactive CLI session.
-    Acts as the 'Controller' in this MVC-like architecture.
+    Controller class that manages the state and command loop of the CLI application.
     """
     
     def __init__(self):
-        # Initialize session state variables
-        self.current_user = None  # Who is logged in?
-        self.current_role = None  # What permissions do they have?
-        self.active_product = None  # What satellite image are we working on?
+        """
+        Initializes the session state and instantiates all system components.
+        """
+        # --- SESSION STATE ---
+        self.current_user = None  # Stores the username of the logged-in operator
+        self.current_role = None  # Stores the RBAC role (admin/analyst/user)
+        self.active_product = None  # Stores the ID of the product currently being processed
         
-        # Instantiate System Components
-        # We create instances of our classes to use their methods
+        # --- COMPONENT INSTANTIATION ---
         self.source = EOSimulator()
         self.ingest = IngestionManager()
         self.processor = ProcessingEngine()
@@ -58,321 +56,343 @@ class InteractiveSession:
         self.ac = AccessController()
         self.backup = ResilienceManager()
         
-        # System State Tracking
-        # This dictionary keeps track of the 'lifecycle' of the active product
-        # It's like a checklist verifying what steps have been done
+        # --- PIPELINE TRACKING ---
+        # This dictionary tracks the completion status of each lifecycle stage
         self.state = {
-            "generated": False,  # Step 1: Created?
-            "ingested": False,   # Step 2: Ingested?
-            "processed": False,  # Step 3: Processed?
-            "archived": False,   # Step 4: Encrypted?
-            "hacked": False      # Status: Compromised?
+            "generated": False,  # Step 1: Raw data created
+            "ingested": False,   # Step 2: Validated and fingerprinted
+            "processed": False,  # Step 3: Calibrated and QC checked
+            "archived": False,   # Step 4: Encrypted and vaulted
+            "hacked": False      # Simulation status: Data corrupted on disk
         }
 
     def clear(self):
         """
-        Clears the terminal screen and repaints the banner.
-        Keeps the UI fresh and clean.
+        Refreshes the terminal screen and repaints the application header.
         """
+        # Standard Rich clear command
         console.clear()
+        # Repaint the top banner
         self.print_banner()
 
     def print_banner(self):
         """
-        Displays the main application header and status bar.
+        Displays the main application branding and real-time session status.
         """
-        # Print the fixed title panel
+        # Render the main project title in a cyan panel
         console.print(Panel(
             "[bold cyan]SECURE EARTH OBSERVATION PIPELINE[/bold cyan]\n"
-            "[italic white]Interactive Operator Console (Level 2)[/italic white]",
+            "[italic white]Interactive Operator Console (V1.0)[/italic white]",
             border_style="cyan",
             expand=False
         ))
         
-        # Determine how to display the current user status
-        # If logged in -> Green Name. If not -> Red Warning.
+        # --- DYNAMIC STATUS BAR ---
+        # Format the user display based on login status
         user_display = f"[green]{self.current_user}[/green]" if self.current_user else "[red]Not Logged In[/red]"
         role_display = f"({self.current_role})" if self.current_role else ""
         
-        # Determine how to display the active product
-        # If we have one -> Blue ID. If not -> Dim None.
+        # Format the product display
         product_display = f"[blue]{self.active_product}[/blue]" if self.active_product else "[dim]None[/dim]"
         
-        # Create a grid (invisible table) for the Status Bar
+        # Create an invisible grid for aligned layout
         grid = Table.grid(expand=True)
-        grid.add_column()  # Left column
-        grid.add_column(justify="right")  # Right column
+        grid.add_column()  # Column for User info
+        grid.add_column(justify="right")  # Column for Product info
         
-        # Add the status info to the grid
+        # Add the status row to the grid
         grid.add_row(
             f"User: {user_display} {role_display}", 
             f"Active Target: {product_display}"
         )
         
-        # Print the grid inside a panel
+        # Wrap the grid in a dim white panel for visual separation
         console.print(Panel(grid, style="dim white"))
 
     def help_menu(self):
         """
-        Prints the table of available commands to the user.
+        Prints the command reference table for the operator.
         """
-        # Create a cleaner table without borders
-        table = Table(title="Available Commands", box=None)
+        # Create a table to organize commands and descriptions
+        table = Table(title="Available Operator Commands", box=None)
         
-        # Define Columns
+        # Define the header columns
         table.add_column("Command", style="bold cyan")
         table.add_column("Description", style="white")
         
-        # Add Rows for each capability
-        table.add_row("login", "Log in to the system (e.g., as 'alice_admin' or 'bob_analyst')")
-        table.add_row("logout", "Disconnect current session")
-        table.add_row("scan", "Search for new satellite data (Generate)")
-        table.add_row("ingest", "Securely import the detected data")
-        table.add_row("process", "Run L0->L1 processing and QC")
-        table.add_row("archive", "Encrypt and store data in the vault")
-        table.add_row("hack", "Simulate a cyber-attack (Corruption)")
-        table.add_row("recover", "Attempt disaster recovery from backup")
-        table.add_row("status", "View current product lifecycle status")
-        table.add_row("exit", "Quit validation tool")
+        # Populate the table with system capabilities
+        table.add_row("login", "Authenticate with your mission credentials")
+        table.add_row("logout", "Terminate the current secure session")
+        table.add_row("scan", "Acquire new raw signal from Satellite (L0)")
+        table.add_row("ingest", "Verify, fingerprint, and stage data")
+        table.add_row("process", "Run calibration and Quality Control (L1)")
+        table.add_row("archive", "Apply AES-256 encryption and vault data")
+        table.add_row("hack", "SIMULATION: Corrupt the primary archive disk")
+        table.add_row("recover", "Trigger automated hash-audit and repair")
+        table.add_row("status", "Show lifecycle checklist for active target")
+        table.add_row("exit", "Close the console")
         
-        # Render the table to screen
+        # Output the table to the console
         console.print(table)
 
     def print_status_panel(self):
         """
-        Shows the lifecycle checklist (Generated, Ingested, etc.)
+        Displays a visual checklist of the product's progress through the pipeline.
         """
+        # Create a simple status table
         table = Table(box=None)
-        table.add_column("Stage")
+        table.add_column("Lifecycle Stage")
         table.add_column("Status")
         
-        # Loop through the state dictionary keys
+        # Iterate through defined stages
         stages = ["generated", "ingested", "processed", "archived", "hacked"]
         for s in stages:
-            # Default is "NO" (dim color)
-            status = "[green]YES[/green]" if self.state[s] else "[dim]NO[/dim]"
+            # Determine the status label based on the state dictionary
+            status = "[green]COMPLETED[/green]" if self.state[s] else "[dim]PENDING[/dim]"
             
-            # Special case for "hacked": if true, it's RED (bad)
+            # Special formatting for the 'Hacked' status (Red indicates danger)
             if s == "hacked" and self.state[s]: 
-                status = "[bold red]COMPROMISED[/bold red]"
+                status = "[bold red]CORRUPTED[/bold red]"
                 
+            # Add the row to the table
             table.add_row(s.upper(), status)
             
-        console.print(Panel(table, title="Product Lifecycle Status"))
+        # Wrap the table in a panel for the final UI
+        console.print(Panel(table, title="Product Verification Status"))
 
     def login(self):
         """
-        Handles user authentication dialog.
+        Authenticates an operator using the Access Control component.
         """
-        console.print("\n[bold]Available Users:[/bold]")
-        # Show the list of valid users from config so the user knows what to type
+        console.print("\n[bold underline]Mission Personnel Directory:[/bold underline]")
+        # Display valid users to assist the simulation operator
         for u, r in config.USERS.items():
-            console.print(f" - {u} ({r})")
+            console.print(f" - {u} (Role: {r})")
             
-        # Ask for input
-        user = Prompt.ask("\nUsername")
+        # Capture user input
+        user = Prompt.ask("\nEnter Username")
         
-        # Authenticate via Access Controller
+        # Call the Access Controller to verify credentials and retrieve role
         role = self.ac.authenticate(user)
         
         if role:
-            # Success: Update session state
+            # Update the session state upon success
             self.current_user = user
             self.current_role = role
-            console.print(f"[green]✔ Login Successful. Welcome, {user}.[/green]")
+            console.print(f"[green]✔ Access Granted. Welcome, Operator {user}.[/green]")
         else:
-            # Failure: Warn user
-            console.print("[red]❌ Login Failed. User unknown.[/red]")
+            # Report failure
+            console.print("[red]❌ Access Denied. Identity not recognized.[/red]")
 
     def check_auth(self, action):
         """
-        Helper to check if current user can do X.
+        Validates if the current operator is authorized to perform a specific action.
+        
+        RETURNS:
+            bool: True if authorized, False otherwise.
         """
-        # 1. Are they logged in?
+        # Step 1: Check if anyone is even logged in
         if not self.current_user:
-            console.print("[red]❌ Access Denied: Please Login first.[/red]")
+            console.print("[red]❌ Error: Authentication Required. Please 'login'.[/red]")
             return False
             
-        # 2. Do they have permission?
+        # Step 2: Query the Access Controller for granular permission check
         if self.ac.authorize(self.current_user, action):
+            # Permission granted
             return True
         else:
-            console.print(f"[red]❌ Authorization Failed: '{self.current_user}' cannot perform '{action}'.[/red]")
+            # Permission denied based on RBAC policy
+            console.print(f"[red]❌ Error: Unauthorized. '{self.current_user}' lacks '{action}' rights.[/red]")
             return False
 
     def check_prereq(self, prereq_key, step_name):
         """
-        Helper to enforce linear pipeline order.
-        Example: Cannot 'archive' before 'process'.
+        Enforces the linear flow of the data pipeline.
+        Ensures users don't try to archive data that hasn't been processed yet.
         """
-        # Check if we even have a product selected
+        # Step 1: Ensure we have a product to work on
         if not self.active_product:
-             console.print("[yellow]⚠ No active product found. Run 'scan' first.[/yellow]")
+             console.print("[yellow]⚠ Warning: No active target selected. Run 'scan' first.[/yellow]")
              return False
         
-        # Check if the previous step was completed successfully
+        # Step 2: Ensure the preceding step was completed successfully
         if prereq_key and not self.state[prereq_key]:
-             console.print(f"[yellow]⚠ Cannot {step_name}: Previous step failed or skipped.[/yellow]")
+             console.print(f"[yellow]⚠ Warning: Cannot {step_name}. Prerequisites not met.[/yellow]")
              return False
         return True
 
     def scan(self):
         """
-        Step 1: Generate Data.
+        COMMAND: scan
+        Generates a new raw satellite product (Level-0).
         """
-        # Allow generating without auth usually, but let's encourage login
+        # Allow scanning without auth for the demo, but show a note
         if not self.current_user:
-             console.print("[italic]Note: You are scanning anonymously.[/italic]")
+             console.print("[italic]Operating in Anonymous Mode...[/italic]")
         
-        # Generate a random Product ID for this session
+        # Create a semi-random ID to simulate a mission product name
         pid = f"Sentinel_2_{random.randint(1000,9999)}_Orbit{random.randint(10,99)}"
         
-        # Show a spinner to look cool
-        with console.status("[cyan]Scanning for downlink signal...[/cyan]", spinner="earth"):
-            time.sleep(2) # Fake wait
-            # Create the data on disk
+        # Display a high-tech loading spinner
+        with console.status("[cyan]Listening for satellite downlink signal...[/cyan]", spinner="earth"):
+            time.sleep(2) # Simulate the duration of a signal pass
+            # Call the Simulator component to create files on disk
             self.source.generate_product(pid)
         
-        # Update State
+        # Update session state
         self.active_product = pid
         self.state["generated"] = True
         
-        console.print(f"[green]✔ Signal Acquired.[/green] New Product ID: [bold]{pid}[/bold]")
-        console.print("[dim italic]ℹ  Raw data represents digital signal from the satellite.[/dim italic]")
+        # Report success
+        console.print(f"[green]✔ Signal Locked.[/green] New Target: [bold]{pid}[/bold]")
+        console.print("[dim italic]ℹ  Metadata validated and Level-0 binary generated.[/dim italic]")
 
     def ingest(self):
         """
-        Step 2: Ingest Data.
-        Requires 'process' permission (analyst/admin).
+        COMMAND: ingest
+        Validates the raw data and creates the initial integrity hash.
         """
-        # Check permissions
+        # Step 1: Check if user has permission to 'process' data
         if not self.check_auth("process"): return  
-        # Check flow (Must be generated first)
+        # Step 2: Check if data was even generated
         if not self.check_prereq("generated", "Ingest"): return
         
-        console.print("[dim italic]ℹ  Validating metadata, calculating initial SHA-256 hash...[/dim italic]")
+        console.print("[dim italic]ℹ  Validating schema and baselining SHA-256 integrity...[/dim italic]")
         
-        with console.status("[cyan]Ingesting...[/cyan]"):
-            # Call the Ingestion Component
+        with console.status("[cyan]Performing Secure Ingestion...[/cyan]"):
+            # Call the Ingestion component logic
             path = self.ingest.ingest_product(self.active_product)
         
         if path:
+            # Success: Mark state
             self.state["ingested"] = True
-            console.print("[green]✔ Ingestion Complete.[/green] Product is now in the secure boundary.")
+            console.print("[green]✔ Ingestion successful.[/green] Data fingerprinted and staged.")
         else:
-            console.print("[red]❌ Ingestion Failed.[/red]")
+            # Failure (e.g. invalid metadata)
+            console.print("[red]❌ Ingestion failed validation.[/red]")
 
     def process(self):
         """
-        Step 3: Process Data (L0 -> L1).
+        COMMAND: process
+        Converts raw data to scientific products and checks quality.
         """
+        # Step 1: Authorization
         if not self.check_auth("process"): return
+        # Step 2: Pipeline Order
         if not self.check_prereq("ingested", "Process"): return
         
-        console.print("[dim italic]ℹ  Running radiometric calibration and Quality Control (finding bad pixels)...[/dim italic]")
-        with console.status("[cyan]Processing L0 -> L1...[/cyan]", spinner="dots"):
-            time.sleep(1.5)
-            # Call the Processor Component
+        console.print("[dim italic]ℹ  Applying radiometric calibration and checking for sensor noise...[/dim italic]")
+        with console.status("[cyan]Processing Level-0 -> Level-1...[/cyan]", spinner="dots"):
+            time.sleep(1.5) # Simulate computation time
+            # Call the Processing component
             path = self.processor.process_product(self.active_product)
             
         if path:
+            # Success
             self.state["processed"] = True
-            console.print("[green]✔ Processing Complete.[/green] Data is Level-1 certified.")
+            console.print("[green]✔ Processing successful.[/green] Level-1C product ready.")
         else:
-            console.print("[red]❌ Processing Failed (QC Error).[/red]")
+            # Failure (e.g. QC failure due to NaN values)
+            console.print("[red]❌ Processing failed Quality Control check.[/red]")
 
     def archive(self):
         """
-        Step 4: Archive (Encrypt).
-        Requires 'write' permission.
+        COMMAND: archive
+        Encrypts the product and stores it in the high-security vault.
         """
+        # Step 1: Authorization (Requires 'write' permission)
         if not self.check_auth("write"): return 
+        # Step 2: Pipeline Order
         if not self.check_prereq("processed", "Archive"): return
         
-        console.print("[dim italic]ℹ  Encrypting with AES-256 and moving to Vault...[/dim italic]")
-        with console.status("[cyan]Encrypting...[/cyan]", spinner="lock"):
+        console.print("[dim italic]ℹ  Executing AES-256 encryption and replicating to backup...[/dim italic]")
+        with console.status("[cyan]Vaulting Product...[/cyan]", spinner="lock"):
             time.sleep(1.5)
-            # Call Archive Manager
+            # 1. Move to Encrypted Archive
             self.archive.archive_product(self.active_product)
-            # Immediately back up!
+            # 2. Immediately create a redundant backup for resilience
             self.backup.create_backup(self.active_product)
             
+        # Update state
         self.state["archived"] = True
-        console.print("[green]✔ Archived & Backed Up.[/green] Data is safe at rest.")
+        console.print("[green]✔ Archiving successful.[/green] Data is encrypted-at-rest.")
 
     def hack(self):
         """
-        Simulate an attack.
-        No permissions needed - Hackers don't need permission!
+        COMMAND: hack
+        Simulates an external attack that corrupts data on the storage disk.
         """
-        # Check if there is anything to hack
+        # Verify there is actually an archived product to attack
         if not self.active_product or not self.state["archived"]:
-            console.print("[yellow]⚠ Nothing to hack! Archive some data first.[/yellow]")
+            console.print("[yellow]⚠ Error: No archived data found to simulate an attack upon.[/yellow]")
             return
             
-        console.print("[bold red]☠  INITIATING CYBER ATTACK...[/bold red]")
-        console.print("[dim italic]ℹ  Injecting garbage bytes into the primary storage disk...[/dim italic]")
+        console.print("[bold red]☠  INITIATING SIMULATED DATA CORRUPTION...[/bold red]")
         
-        # Construct path to the target file
+        # Determine the physical path of the vaulted file
         target = os.path.join(config.ARCHIVE_DIR, f"{self.active_product}.enc")
         
         if os.path.exists(target):
-            # Overwrite the file with junk (CORRUPTION)
+            # MALICIOUS ACTION: Overwrite the encrypted bytes with garbage text
             with open(target, "wb") as f:
-                f.write(b"CORRUPTED_BY_USER_CMD")
+                f.write(b"MALICIOUS_CORRUPTION_EVENT_000")
                 
+            # Update state to reflect corruption
             self.state["hacked"] = True
-            console.print(f"[red]✔ Data Corrupted.[/red] Hash mismatch created.")
+            console.print(f"[red]✔ Attack successful.[/red] Primary data file has been corrupted.")
         else:
-            console.print("[red]❌ Attack failed: File not found.[/red]")
+            console.print("[red]❌ Attack failed: File not located.[/red]")
 
     def recover(self):
         """
-        Recover from attack.
-        Requires 'manage_keys' permission (Admin only).
+        COMMAND: recover
+        Uses resilience mechanisms to detect and repair the corruption.
         """
+        # Requires high-level 'manage_keys' permission (Admin only)
         if not self.check_auth("manage_keys"): return
+        # Must be an archived product
         if not self.check_prereq("archived", "Recover"): return
         
-        console.print("[dim italic]ℹ  Checking integrity hashes against backup...[/dim italic]")
+        console.print("[dim italic]ℹ  Auditing storage integrity against secondary backup...[/dim italic]")
         
-        # Define a helper to get the "Known Good Hash" from the backup
-        # This simulates having a separate secure catalog
+        # Define a callback to fetch the "Known Good Hash" from the backup vault
         def get_expected_hash(p):
-            # Calculate hash of backup file
             bk_path = os.path.join(config.BACKUP_DIR, f"{p}.enc")
+            # Calculate the hash of the backup (trusted copy)
             return security.calculate_hash(bk_path)
 
-        with console.status("[green]Healing...[/green]", spinner="material"):
-            time.sleep(2) # Fake processing time
-            # Trigger recovery Logic
+        with console.status("[green]Healing System...[/green]", spinner="material"):
+            time.sleep(2) # Simulate audit and data transfer time
+            # Trigger the Resilience Manager's recovery logic
             fixed = self.backup.verify_and_restore(self.active_product, get_expected_hash)
             
         if fixed:
+            # Success: Corruption repaired
             self.state["hacked"] = False
-            console.print("[green]✔ System Restored.[/green] Resilience mechanisms successful.")
+            console.print("[green]✔ Recovery successful.[/green] System integrity restored.")
         else:
-             console.print("[red]❌ Recovery Failed.[/red]")
+             # Failure: Could not recover
+             console.print("[red]❌ Recovery failed. Backup may also be compromised.[/red]")
              
     def run(self):
         """
-        Main Event Loop.
+        The main application loop that handles user input and command dispatching.
         """
         self.clear()
-        console.print("Type [bold cyan]help[/bold cyan] to see commands.")
+        console.print("System online. Type [bold cyan]help[/bold cyan] for commands.")
         
-        # Infinite Loop until 'exit'
+        # Continuous loop until 'exit' command
         while True:
             try:
-                # Refresh status UI
+                # Repaint the UI banner each time
                 self.print_banner()
                 
-                # Get User Input
-                cmd = Prompt.ask("COMMAND").strip().lower()
+                # Prompt the operator for the next command
+                cmd = Prompt.ask("MISSION_CONTROL> ").strip().lower()
                 
-                # Dispatcher Logic (Switch Case)
+                # --- COMMAND DISPATCHER ---
                 if cmd == "exit":
-                    console.print("[bold]Goodbye.[/bold]")
+                    console.print("[bold]Console Session Terminated.[/bold]")
                     break
                 elif cmd == "help":
                     self.help_menu()
@@ -381,10 +401,10 @@ class InteractiveSession:
                 elif cmd == "login":
                     self.login()
                 elif cmd == "logout":
-                    # Clear session info
+                    # Reset session variables
                     self.current_user = None
                     self.current_role = None
-                    console.print("Logged out.")
+                    console.print("Logged out successfully.")
                 elif cmd == "scan":
                     self.scan()
                 elif cmd == "ingest":
@@ -398,29 +418,31 @@ class InteractiveSession:
                 elif cmd == "recover":
                     self.recover()
                 elif cmd == "":
-                    pass # Do nothing on empty enter
+                    # Do nothing for empty input
+                    pass 
                 else:
-                    console.print(f"[red]Unknown command: {cmd}[/red]")
+                    # Inform the user of invalid input
+                    console.print(f"[red]Error: Unknown mission command '{cmd}'.[/red]")
                 
-                # Pause so user can read result
-                input("\nPress Enter to continue...")
-                console.clear()
+                # Pause the screen so the operator can review the result
+                input("\n[Press Enter to return to console]")
+                self.clear()
                 
             except KeyboardInterrupt:
-                # Handle Ctrl+C gracefully
-                console.print("\n[bold]Session Terminated.[/bold]")
+                # Graceful handling of Ctrl+C
+                console.print("\n[bold]Emergency Stop: Session Terminated.[/bold]")
                 break
             except Exception as e:
-                 # Catch-all for crashes
-                console.print(f"[red]Error: {e}[/red]")
+                 # Catch and report any unhandled crashes to keep the console alive
+                console.print(f"[bold red]SYSTEM ERROR:[/bold red] {e}")
 
 if __name__ == "__main__":
-    # Startup Check: Clean environment?
+    # --- STARTUP ENVIRONMENT CLEANING ---
     if os.path.exists("simulation_data"):
-        # We clean the data folder to start fresh each run
+        # Import shutil to delete old artifacts and start with a clean slate
         import shutil
         shutil.rmtree("simulation_data")
         
-    # Launch the application
+    # --- LAUNCH APPLICATION ---
     session = InteractiveSession()
     session.run()

@@ -1,105 +1,124 @@
-# Import os for file management
+# Import the os module for interacting with the filesystem (checking files, making directories)
 import os
-# Import json for reading schemas
+# Import json for parsing and updating product metadata
 import json
-# Import shutil for moving files
+# Import shutil for high-level file operations (moving files between security zones)
 import shutil
-# Import project config
+# Import the central configuration to access environment paths and roles
 from secure_eo_pipeline import config
-# Import security utils for Hashing
+# Import the security utility to calculate the initial integrity hash
 from secure_eo_pipeline.utils import security
-# Import logging
+# Import the shared audit log to record ingestion success/failure
 from secure_eo_pipeline.utils.logger import audit_log
 
 # =============================================================================
-# Secure Ingestion Component
+# Secure Ingestion Component - Line-by-Line Technical Explanation
 # =============================================================================
 # ROLE IN ARCHITECTURE:
-# The "Border Guard".
-# Data arriving from the satellite (Source) is "Untrusted" until verified.
-# This component validates it before letting it enter the internal implementation.
+# The "Border Guard" / "Customs Officer".
+# All data entering from the 'Data Source' (Space Segment) is considered
+# "Untrusted" until it passes through this component.
 #
 # SECURITY PRINCIPLES:
-# 1. Input Validation: Check schemas and formats.
-# 2. Integrity Baselining: Capture the Hash NOW so we can detect changes later.
+# 1. Input Validation: Reject malformed or dangerous data before it is processed.
+# 2. Integrity Baselining: Capture a "Source of Truth" hash immediately.
+# 3. Secure Handover: Move data from the Landing Zone to the Internal Staging.
 # =============================================================================
 
 class IngestionManager:
     """
-    Handles the secure intake of new EO products.
+    Handles the secure intake and validation of newly arrived EO products.
     """
 
     def ingest_product(self, product_id):
         """
-        Validates and registers a product.
+        Validates, fingerprints, and registers a product for internal use.
         
-        FLOW:
-        1. Check existence -> 2. Check Schema -> 3. Hash -> 4. Move to Process
+        ARGUMENTS:
+            product_id (str): The unique identifier of the product to ingest.
+            
+        RETURNS:
+            str: The new path to the ingested file, or None if validation fails.
         """
+        # Step 1: Log the start of the ingestion request
+        audit_log.info(f"[INGEST] START: Received ingestion request for product {product_id}")
         
-        audit_log.info(f"[INGEST] Starting ingestion for {product_id}")
-        
-        # Define paths in the Landing Zone (Ingest Dir)
+        # Step 2: Define expected source paths in the Landing Zone (Untrusted)
         source_file = os.path.join(config.INGEST_DIR, f"{product_id}.npy")
         source_meta = os.path.join(config.INGEST_DIR, f"{product_id}.json")
         
         # ---------------------------------------------------------------------
-        # VALIDATION PHASE
+        # PHASE 1: EXISTENCE VALIDATION
         # ---------------------------------------------------------------------
-        
-        # Check 1: Do files actually exist?
+        # Check: Did both the binary data AND the metadata file arrive?
         if not os.path.exists(source_file) or not os.path.exists(source_meta):
-            # Error if missing
-            audit_log.error(f"[INGEST] FAILED: Missing files for {product_id}")
+            # Log a critical failure if part of the product is missing
+            audit_log.error(f"[INGEST] FAILED: Incomplete product. Missing files for {product_id}.")
             return None
             
-        # Check 2: Schema Validation (Is the JSON structured correctly?)
+        # ---------------------------------------------------------------------
+        # PHASE 2: SCHEMA VALIDATION (Content Integrity)
+        # ---------------------------------------------------------------------
+        # We must ensure the metadata isn't "poisoned" or malformed.
         try:
+            # Step 1: Open and parse the JSON metadata
             with open(source_meta, "r") as f:
                 meta = json.load(f)
-                # Define list of fields that MUST be there
-                required_keys = ["product_id", "timestamp", "sensor"]
-                # If any key is missing, REJECT the file.
-                if not all(key in meta for key in required_keys):
-                    raise ValueError("Missing required metadata fields")
-        except Exception as e:
-            # Catch bad JSON or missing fields
-            audit_log.error(f"[INGEST] FAILED: Invalid metadata for {product_id}. Error: {e}")
+                
+            # Step 2: Define the "Minimum Viable Metadata" (MVM)
+            # RATIONALE: If these keys are missing, our processing engine won't know what to do.
+            required_keys = ["product_id", "timestamp", "sensor"]
+            
+            # Step 3: Check if all mandatory keys exist in the provided file
+            if not all(key in meta for key in required_keys):
+                # If any are missing, the file is invalid.
+                raise ValueError(f"Missing mandatory fields: {set(required_keys) - set(meta.keys())}")
+                
+        except (json.JSONDecodeError, ValueError) as e:
+            # Catch bad formatting or missing fields and log the specific reason
+            audit_log.error(f"[INGEST] FAILED: Schema validation failed for {product_id}. Error: {e}")
+            # STOP the pipeline here. Do not let invalid data proceed.
             return None
 
         # ---------------------------------------------------------------------
-        # INTEGRITY BASELINING PHASE
+        # PHASE 3: INTEGRITY BASELINING (Digital Fingerprinting)
         # ---------------------------------------------------------------------
-        
-        # Check 3: Calculate the "Source of Truth" Hash.
-        # We do this immediately. This hash is our reference for the rest of eternity.
+        # This is the most critical step for security.
+        # We calculate the SHA-256 hash of the binary data at the moment of arrival.
+        # RATIONALE: This hash becomes the "Legal Signature" of the file.
         file_hash = security.calculate_hash(source_file)
         
-        # We store this hash IN the metadata.
-        # This binds the data content to its description.
+        # We embed this hash INSIDE the metadata.
+        # This "binds" the data file to its metadata record.
         meta["original_hash"] = file_hash
+        # Update the status to reflect that it has been checked
         meta["status"] = "INGESTED"
         
         # ---------------------------------------------------------------------
-        # TRANSFER PHASE
+        # PHASE 4: SECURE HANDOVER (Isolation)
         # ---------------------------------------------------------------------
+        # Once validated, we move the data to a "Trusted" processing zone.
+        # RATIONALE: We want to empty the Landing Zone quickly to reduce attack surface.
         
-        # Ensure destination exists
+        # Step 1: Ensure the Processing Staging directory exists
         if not os.path.exists(config.PROCESSING_DIR):
             os.makedirs(config.PROCESSING_DIR)
             
-        # Describe where the files are going (Processing Staging)
+        # Step 2: Define new destination paths inside the secure boundary
         dest_file = os.path.join(config.PROCESSING_DIR, f"{product_id}.npy")
         dest_meta = os.path.join(config.PROCESSING_DIR, f"{product_id}.json")
         
-        # Move files from "Untrusted" (Ingest) to "Trusted" (Processing)
+        # Step 3: Physically move the data
+        # shutil.copy() is used here (could use move, but copy allows for easy re-runs in demo)
         shutil.copy(source_file, dest_file)
         
-        # Save updated metadata (now containing the Hash)
+        # Step 4: Save the UPDATED metadata (now containing the Source Hash)
         with open(dest_meta, "w") as f:
+            # Dump the dictionary back to JSON with clean indentation
             json.dump(meta, f, indent=4)
             
-        # Log Success
-        audit_log.info(f"[INGEST] SUCCESS: Product {product_id} ingested. Hash: {file_hash}")
-        # Return path to the moved file
+        # Step 5: Finalize the log for the audit trail
+        audit_log.info(f"[INGEST] SUCCESS: Product {product_id} is verified and staged. Initial Hash: {file_hash}")
+        
+        # Return the new path so the pipeline can continue to 'Processing'
         return dest_file

@@ -1,103 +1,131 @@
-# Import OS module for path handling
+# Import the os module for interacting with the filesystem (finding files, joining paths)
 import os
-# Import JSON for metadata modification
+# Import json for reading and updating the product's metadata record
 import json
-# Import NumPy for data processing
+# Import NumPy to perform mathematical operations on the scientific data
 import numpy as np
-# Import project configuration
+# Import the central configuration to access the processing directory path
 from secure_eo_pipeline import config
-# Import security utils (for re-hashing)
+# Import the security utility to verify and update data integrity hashes
 from secure_eo_pipeline.utils import security
-# Import logger
+# Import the shared audit logger to record processing milestones
 from secure_eo_pipeline.utils.logger import audit_log
 
 # =============================================================================
-# Processing & Quality Control Component
+# Processing & Quality Control Component - Line-by-Line Explanation
 # =============================================================================
 # ROLE IN ARCHITECTURE:
-# The "Factory".
-# Takes validated raw data and transforms it into useful scientific products.
+# The "Scientific Factory".
+# This component takes raw Level-0 data (raw signals) and converts them into
+# Level-1 products (calibrated reflectance values).
 #
-# SECURITY IMPLICATION:
-# When we process data, we change it. This changes its Hash.
-# Therefore, we must:
-# 1. Verify input integrity (Is it still valid?)
-# 2. Process/Transform
-# 3. Calculate NEW integrity (Provenance)
+# SECURITY & TRUST:
+# Processing is the moment where data changes. In a secure pipeline, we must
+# ensure that the data we are processing hasn't been tampered with since ingestion.
+#
+# QC (QUALITY CONTROL):
+# We check for sensor malfunctions (NaN values) to ensure data 'Cleanliness'.
 # =============================================================================
 
 class ProcessingEngine:
     """
-    Handles data processing and Quality Control (QC).
+    Handles the scientific transformation and quality assurance of EO data.
     """
 
     def process_product(self, product_id):
         """
-        Simulates Level-0 to Level-1 processing.
+        Executes a Level-0 to Level-1 processing chain.
+        
+        ARGUMENTS:
+            product_id (str): The unique ID of the product currently in staging.
         """
-        # Define paths to input files (in Processing Staging)
+        # Step 1: Define paths to the input files within the Processing Staging area
         input_file = os.path.join(config.PROCESSING_DIR, f"{product_id}.npy")
         input_meta = os.path.join(config.PROCESSING_DIR, f"{product_id}.json")
         
-        audit_log.info(f"[PROCESS] Starting processing for {product_id}")
+        # Step 2: Log the start of the processing session
+        audit_log.info(f"[PROCESS] START: Processing Level-0 -> Level-1 for {product_id}")
         
-        # 1. LOAD DATA
+        # ---------------------------------------------------------------------
+        # PHASE 1: INTEGRITY VERIFICATION (Chain of Custody)
+        # ---------------------------------------------------------------------
+        # Before we touch the data, we must prove it is the SAME data that was ingested.
         try:
-            # Load the binary numpy array
-            data = np.load(input_file)
+            # Step 1: Read the metadata to find the "Expected Hash"
+            with open(input_meta, "r") as f:
+                meta = json.load(f)
+            
+            # Step 2: Retrieve the hash recorded by the Ingestion component
+            expected_hash = meta.get("original_hash")
+            
+            # Step 3: Calculate the ACTUAL hash of the file right now
+            actual_hash = security.calculate_hash(input_file)
+            
+            # Step 4: Compare. If they don't match, someone edited the file illegally!
+            if actual_hash != expected_hash:
+                audit_log.error(f"[PROCESS] SECURITY ALERT: Input integrity mismatch for {product_id}!")
+                # STOP: Do not process tampered data.
+                return None
         except Exception as e:
-            # Handle load errors (e.g., file lock, missing)
-            audit_log.error(f"[PROCESS] ERROR: Could not load {product_id}. {e}")
+            # Handle cases where files are missing or metadata is corrupted
+            audit_log.error(f"[PROCESS] FAILED: Could not verify input integrity. Error: {e}")
             return None
+
+        # ---------------------------------------------------------------------
+        # PHASE 2: DATA LOADING & QUALITY CONTROL (QC)
+        # ---------------------------------------------------------------------
+        try:
+            # Step 1: Load the binary scientific data into memory (as a NumPy array)
+            data = np.load(input_file)
             
-        # ---------------------------------------------------------------------
-        # QUALITY CONTROL (QC) PHASE
-        # ---------------------------------------------------------------------
-        # In EO, sensors can fail, clouds can block view, or cosmic rays can hit bits.
-        # We must check if the data is "Science Ready".
-        
-        # Check: Are there any "Not a Number" values?
-        # a 'NaN' usually indicates a missing pixel or sensor error
-        if np.isnan(data).any():
-            audit_log.warning(f"[QC] FAILED: Data corruption detected in {product_id} (NaN values found).")
-            # FAIL-SAFE: We return None. We stop the pipeline. 
-            # We do NOT pass bad data to the archive.
+            # Step 2: Perform the "Cleanliness" Check (Quality Control)
+            # Sensors sometimes fail and produce 'Not a Number' (NaN) values.
+            # RATIONALE: We don't want to waste storage space on garbage data.
+            if np.isnan(data).any():
+                # If even one pixel is NaN, we flag it as a Quality Failure.
+                audit_log.warning(f"[QC] REJECTED: Sensor corruption (NaN) detected in product {product_id}.")
+                # Fail the processing step.
+                return None
+                
+        except Exception as e:
+            # Handle file read errors or memory issues
+            audit_log.error(f"[PROCESS] FAILED: Data load error for {product_id}. Error: {e}")
             return None
-            
+
         # ---------------------------------------------------------------------
-        # TRANSFORMATION PHASE
+        # PHASE 3: SCIENTIFIC TRANSFORMATION
         # ---------------------------------------------------------------------
-        # Simulation: Simple division (Radiometric Calibration)
-        # We convert "Digital Numbers" (DN) to "Top of Atmosphere Reflectance"
+        # Simulation: Radiometric Calibration.
+        # We assume the raw data is in 8-bit integers (0-255).
+        # We normalize this to a percentage reflectance (0.0 to 1.0).
         processed_data = data / 255.0
         
-        # OVERWRITE the file with the new version
+        # Step 1: Overwrite the binary file in the staging area with the NEW processed version.
         np.save(input_file, processed_data)
         
         # ---------------------------------------------------------------------
-        # PROVENANCE TRACKING
+        # PHASE 4: PROVENANCE TRACKING (Updating the Record)
         # ---------------------------------------------------------------------
-        # We must document that this file has changed.
+        # Since the file content has changed, we must document the transformation.
         
-        # Load the metadata
-        with open(input_meta, "r") as f:
-            meta = json.load(f)
-            
-        # Update metadata fields
-        meta["processing_timestamp"] = "NOW"
-        meta["processing_level"] = "L1" # It has leveled up
+        # Step 1: Record the new processing level and status
+        meta["processing_level"] = "Level-1C" # The product has been calibrated
         meta["status"] = "PROCESSED"
+        meta["qc_status"] = "PASSED"
         
-        # IMPORTANT: Calculate a NEW hash for the NEW content.
-        # This creates a "Chain of Custody". The old hash is for the old file.
+        # Step 2: CALCULATE A NEW HASH.
+        # RATIONALE: The old hash is no longer valid because the content is different.
+        # We need a new "Digital Signature" for the Level-1 product.
         new_hash = security.calculate_hash(input_file)
+        # We store this as the "Processed Hash" to maintain the Chain of Custody.
         meta["processed_hash"] = new_hash
         
-        # Save updated metadata
+        # Step 3: Save the updated metadata back to disk
         with open(input_meta, "w") as f:
             json.dump(meta, f, indent=4)
             
-        # Log success
-        audit_log.info(f"[PROCESS] SUCCESS: Product {product_id} processed to Level-1.")
-        # Return path
+        # Step 4: Finalize the log for the audit trail
+        audit_log.info(f"[PROCESS] SUCCESS: {product_id} is now Level-1 certified. New Hash: {new_hash}")
+        
+        # Return the path to the processed product
         return input_file

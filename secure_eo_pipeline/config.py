@@ -1,88 +1,81 @@
-# Import OS module to handle file paths in an operating-system-agnostic way
+# Import the os module to handle file paths in an operating-system-agnostic way (works on Windows, Linux, and macOS)
 import os
 
 # =============================================================================
-# Secure EO Pipeline - Configuration Module
+# Secure EO Pipeline - Configuration Module - Line-by-Line Explanation
 # =============================================================================
 # PURPOSE:
-# This module acts as the "Central Nervous System" for configuration.
-# It defines:
-# 1. File Paths (Where data lives)
-# 2. Security Parameters (Where keys live)
-# 3. Access Control Policies (Who can do what)
+# This module acts as the "Central Nervous System" for project settings.
+# It defines the file system structure, security parameters, and access policies.
 #
 # DESIGN RATIONALE:
-# Hardcoding paths in random scripts is bad practice (Security & Maintainability).
-# By centralizing them here, we can easily switch between "Dev", "Test", and "Prod" environments.
+# By centralizing configuration, we avoid "Hardcoding" (typing paths directly
+# into scripts). This makes the system more maintainable, scalable, and secure.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # 1. FILE SYSTEM ARCHITECTURE
 # -----------------------------------------------------------------------------
-# We simulate a distributed ground segment using local folders.
-# In a real ESA mission, these might be:
-# - INGEST_DIR -> An S3 Bucket or FTP Landing Zone
-# - ARCHIVE_DIR -> A Tape Library or Glacier Storage
+# We simulate a ground segment environment using specialized directories.
+# In a real mission, these would be distributed across different servers or clouds.
 # -----------------------------------------------------------------------------
 
 # Base directory for all simulation artifacts. 
-# Using a relative path keeps the project portable.
+# Using a relative path ("simulation_data") keeps the project portable.
 BASE_DIR = "simulation_data"
 
 # [Landing Zone]
-# Where raw satellite data "lands" first. 
-# Security Level: LOW (Untrusted content).
-# We use os.path.join to ensure this works on Windows and Linux/Mac.
+# Where raw satellite data first arrives. 
+# SECURITY LEVEL: LOW (External data is untrusted and must be validated).
+# os.path.join() is used to construct the path correctly for any OS.
 INGEST_DIR = os.path.join(BASE_DIR, "ingest_landing_zone")
 
 # [Processing Staging]
-# Temporary workspace for computation.
-# Security Level: MEDIUM (Data is being modified).
+# A temporary workspace where data is transformed (e.g., L0 to L1 processing).
+# SECURITY LEVEL: MEDIUM (Data is within the security boundary but not yet archived).
 PROCESSING_DIR = os.path.join(BASE_DIR, "processing_staging")
 
 # [Secure Archive]
-# The final resting place for products.
-# Security Level: HIGH (Data must be Encrypted & Immutable).
+# The final storage for verified products.
+# SECURITY LEVEL: HIGH (Data here MUST be encrypted-at-rest and checked for integrity).
 ARCHIVE_DIR = os.path.join(BASE_DIR, "secure_archive")
 
 # [Resilience Backup]
-# A physically separate copy of the data.
-# Security Level: HIGH (Must be kept completely independent of Archive to survive disaster).
+# A redundant copy of the archive kept in a separate logical/physical location.
+# PURPOSE: Disaster Recovery. If the Archive is corrupted, we restore from here.
 BACKUP_DIR = os.path.join(BASE_DIR, "backup_storage")
 
-# Path to the symmetric encryption key.
-# CRITICAL SECURITY ASSET: If this is lost, all data in ARCHIVE_DIR is unreadable.
-# In production, this path would point to a hardware device (HSM) or Vault reference.
+# Path to the symmetric encryption key file.
+# WARNING: This is a critical security asset. In this simulation, it's a local file.
+# In a production ESA system, this would be managed by an HSM (Hardware Security Module).
 KEY_PATH = "secret.key"
 
-# Helper list to ensure these exist at startup
-# The application will loop through this and create them if missing.
+# Helper list of all system directories.
+# The application uses this list to automatically create the folder structure at startup.
 directories = [INGEST_DIR, PROCESSING_DIR, ARCHIVE_DIR, BACKUP_DIR]
 
 # -----------------------------------------------------------------------------
 # 2. IDENTITY & ACCESS MANAGEMENT (IAM)
 # -----------------------------------------------------------------------------
-# We implement a simplified Role-Based Access Control (RBAC) model.
-# Principle: "Least Privilege" -> Users only get the permissions they absolutely need.
+# We implement a Role-Based Access Control (RBAC) model.
+# Principle: "Least Privilege" -> Users only get what they absolutely need to work.
 # -----------------------------------------------------------------------------
 
+# Define the Roles and their associated permissions
 ROLES = {
-    # The 'God Mode' role. 
-    # Can manage encryption keys (very dangerous) and delete data.
+    # 'admin' role: The highest level of trust. Can manage the security core itself.
     "admin": {
-        "description": "Full system control",
+        "description": "Full system control including security management",
         "permissions": ["read", "write", "delete", "manage_keys"]
     },
-    # The Scientist/Engineer role.
-    # Can create and view data, but CANNOT delete critical archives or touch keys.
+    # 'analyst' role: Trusted to process and view data, but cannot delete archives.
     "analyst": {
-        "description": "Data processing and quality control",
+        "description": "Data processing and quality control specialist",
         "permissions": ["read", "write", "process"]
     },
-    # The Consumer role.
-    # Can only VIEW data. Cannot modify or delete anything.
+    # 'user' role: Least trusted. Can only view the final products.
     "user": {
-        "description": "End user consuming EO products",
+        "description": "Standard end user with read-only access",
         "permissions": ["read"]
     }
 }
@@ -90,12 +83,16 @@ ROLES = {
 # -----------------------------------------------------------------------------
 # 3. USER DATABASE (MOCK)
 # -----------------------------------------------------------------------------
-# In a real system, this would be replaced by LDAP, Active Directory, or OIDC.
-# Here, we map usernames directly to roles for demonstration.
+# This maps specific user identities to their assigned roles.
+# In a real environment, this data would come from LDAP, Active Directory, or OAuth2.
 # -----------------------------------------------------------------------------
 USERS = {
-    "emanuele_admin": "admin",      # Has full power
-    "bob_analyst": "analyst",    # Can process data
-    "charlie_user": "user",      # Read-only
-    "eve_hacker": "none"         # Represents an intruder with no valid account
+    # 'emanuele_admin' is assigned the 'admin' role (Full Power)
+    "emanuele_admin": "admin",      
+    # 'bob_analyst' is assigned the 'analyst' role (Can process data)
+    "bob_analyst": "analyst",    
+    # 'charlie_user' is assigned the 'user' role (Can only read)
+    "charlie_user": "user",      
+    # 'eve_hacker' has no valid role, representing an unauthorized intruder
+    "eve_hacker": "none"         
 }

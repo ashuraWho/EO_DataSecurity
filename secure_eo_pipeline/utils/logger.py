@@ -1,54 +1,65 @@
-# Import logging library
+# Import the standard logging library to enable system-wide event tracking
 import logging
-# Import sys to handle standard output streams
+# Import sys to gain access to standard system streams (like stdout for console output)
 import sys
 
 # =============================================================================
-# Logging & Audit Module
+# Logging & Audit Module - Line-by-Line Technical Explanation
 # =============================================================================
 # PURPOSE:
-# In high-security environments (ESA, Defense, Banking), "knowing what happened"
-# is as important as preventing things from happening.
-#
-# This module provides a standardized "Audit Trail".
+# In mission-critical systems, "Auditability" is a core security requirement.
+# This module creates a permanent record (Audit Trail) of all system events.
 #
 # SECURITY GOALS:
-# 1. Non-repudiation: Users cannot deny their actions if logged.
-# 2. Forensics: If a hack occurs, we analyze these logs to find the cause.
+# 1. Accountability: We can prove who did what and when.
+# 2. Incident Response: If a hack occurs, we use logs to reconstruct the timeline.
+# 3. Non-repudiation: A user cannot deny an action if it is securely logged.
 # =============================================================================
 
 def setup_logger(name="EO_Pipeline"):
     """
-    Configures the system-wide logger.
+    Initializes and configures a standardized logging object.
     
-    DESIGN CHOICE:
-    We stream logs to STDOUT (Console) for this demo.
-    In a real system, we would stream to a WORM (Write Once Check Many) drive
-    or a SIEM (Security Information and Event Management) system like Splunk.
+    ARGUMENTS:
+        name (str): The logical name of the component being logged.
+        
+    DESIGN RATIONALE:
+    We use a unified format so that automated security tools (like a SIEM)
+    can easily parse our logs and alert us of anomalies.
     """
-    # Get logger instance
+    # Create or retrieve a logger instance with the specified name
     logger = logging.getLogger(name)
-    # Set level to INFO (ignore DEBUG noise)
+    
+    # Set the global logging sensitivity to INFO.
+    # This captures important events (Logins, Successes, Failures) while ignoring
+    # low-level DEBUG noise that would clutter the audit trail.
     logger.setLevel(logging.INFO)
     
-    # Create the output handler (Where the logs go)
-    # We send to console (sys.stdout)
+    # Define the output destination (Handler).
+    # sys.stdout directs all log messages to the operator's terminal console.
     handler = logging.StreamHandler(sys.stdout)
     
-    # Define the Log Format.
-    # Structure: [TIMESTAMP] - [COMPONENT] - [SEVERITY] - [MESSAGE]
-    # This structure allows automated parsing tools to read the logs later.
+    # Create the Log Formatting structure.
+    # [TIMESTAMP]: When did it happen? (ISO 8601 format)
+    # [NAME]: Which system component reported it?
+    # [LEVEL]: How serious is it? (INFO, WARNING, ERROR)
+    # [MESSAGE]: What actually happened?
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # Apply format to handler
+    
+    # Attach the mathematical formatter to the hardware output handler
     handler.setFormatter(formatter)
     
-    # Prevent adding duplicate handlers if this function is called multiple times.
-    # Otherwise we'd see double or triple lines in the terminal.
+    # CRITICAL CHECK: Does the logger already have handlers?
+    # This prevents the common bug where logs are printed twice or three times
+    # if this setup function is called multiple times during the lifecycle.
     if not logger.handlers:
+        # If the list is empty, attach our newly configured handler
         logger.addHandler(handler)
         
+    # Return the fully configured logger object to the caller
     return logger
 
-# Global instance. 
-# Other modules can just `from logger import audit_log` and start logging immediately.
+# Create a GLOBAL SINGLETON instance of the audit log.
+# This allows any module in the project to simply import 'audit_log' and use it.
+# It ensures all parts of the pipeline speak in a consistent format.
 audit_log = setup_logger()
