@@ -33,7 +33,7 @@ This project is:
 This project is not:
 1. A production‑grade ground segment.
 2. A complete scientific processing chain.
-3. A substitute for enterprise IAM, key management, or HSM solutions.
+3. A substitute for enterprise IAM (Identity and Access Management), key management, or HSM (Hardware Security Module) solutions.
 4. A performance or scalability benchmark.
 
 These exclusions are intentional. The prototype focuses on correctness of security logic and clarity of architecture.
@@ -114,7 +114,7 @@ Availability ensures data is recoverable in the face of failures or attacks.
 
 **Strategy:** Maintain redundant copies in isolated zones and verify integrity before restoration.
 
-### 7.4. Least Privilege and RBAC
+### 7.4. Least Privilege and Role-Based Access Control (RBAC)
 Least privilege reduces the potential damage of compromised accounts. RBAC formalizes this by assigning permissions to roles, not to individuals. This is more scalable and reduces policy drift.
 
 ### 7.5. Defense in Depth
@@ -122,26 +122,24 @@ Security is not a single mechanism but a layered system. If one control fails, a
 
 ---
 
-## 8. Cryptographic Model (Detailed)
+## 8. Cryptographic Model
 ### 8.1. Encryption
 **Library:** `cryptography` (Fernet).
 
 **Fernet properties:**
-1. AES‑128 in CBC mode for confidentiality.
+1. AES‑128 (Advanced Encryption Standard) in CBC (Cipher Block Chaining) mode for confidentiality.
 2. HMAC‑SHA256 for integrity and authenticity.
-3. Random IV generation for semantic security.
+3. Random IV (Initialization Vector) generation for semantic security.
 
-**Why Fernet:** It is safe by default and reduces configuration errors in educational contexts. For production, AES‑GCM or envelope encryption would be preferred, but Fernet is sufficient to demonstrate authenticated encryption principles.
+**Why Fernet:** It is safe by default and reduces configuration errors in educational contexts. For production, AES‑GCM (Advanced Encryption Standard - Galois/Counter Mode) or envelope encryption would be preferred, but Fernet is sufficient to demonstrate authenticated encryption principles.
 
 ### 8.2. Key Management
 1. Key stored in `secret.key`.
 2. Generated automatically if missing.
 3. File permissions restricted to owner where supported.
 
-**Production note:** Real systems use a KMS or HSM for key storage, rotation, and auditability.
-
 ### 8.3. Hashing
-**Algorithm:** SHA‑256.
+**Algorithm:** SHA‑256 (Secure Hash Algorithm 256-bit).
 
 **Rationale:** SHA‑256 is a widely accepted standard for integrity verification. Hashes are computed in chunks to allow processing of large data files without excessive memory use.
 
@@ -191,11 +189,11 @@ The `ResilienceManager`:
 
 ---
 
-## 10. Codebase Walkthrough (Complete)
+## 10. Codebase Walkthrough
 This section explains each module and its role in the system. It is a conceptual walkthrough of the entire codebase.
 
 ### 10.1. `main.py`
-Purpose: interactive CLI that orchestrates all pipeline stages.
+Purpose: interactive CLI (Command Line Interface) that orchestrates all pipeline stages.
 
 Key responsibilities:
 1. Maintains session state and user identity.
@@ -319,7 +317,7 @@ Design rationale:
 1. Network transport security.
 2. Multi‑tenant isolation.
 3. Key rotation policies.
-4. External SIEM integration.
+4. External SIEM (Security Information and Event Management) integration.
 
 Professional security design explicitly states both covered and uncovered risks.
 
@@ -389,6 +387,6 @@ This repository is an educational prototype. Version numbers reflect feature mat
 ---
 
 ## 19. Attribution
-Author: Emanuele Anzellotti 
-Type: Educational / Concept Validation Prototype 
-Target Domain: EO Ground Segment Security
+- **Author**: Emanuele Anzellotti 
+- **Type**: Educational / Concept Validation Prototype 
+- **Target Domain**: EO Ground Segment Security
