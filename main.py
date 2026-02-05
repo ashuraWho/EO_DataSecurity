@@ -39,9 +39,9 @@ class InteractiveSession:
         
         # --- COMPONENT INSTANTIATION ---
         self.source = EOSimulator()  # Creates a simulator instance to generate raw data
-        self.ingest = IngestionManager()  # Creates an ingestion manager to validate and fingerprint data
+        self.ingestion_manager = IngestionManager()  # Creates an ingestion manager to validate and fingerprint data
         self.processor = ProcessingEngine()  # Creates a processing engine to perform QC and calibration
-        self.archive = ArchiveManager()  # Creates an archive manager to encrypt and store data
+        self.archive_manager = ArchiveManager()  # Creates an archive manager to encrypt and store data
         self.ac = AccessController()  # Creates an access controller for RBAC checks (Role-Based Access Control)
         self.backup = ResilienceManager()  # Creates a resilience manager for backup and recovery
         
@@ -263,7 +263,13 @@ class InteractiveSession:
         
         # Update session state
         self.active_product = pid  # Sets the active product ID
-        self.state["generated"] = True  # Marks the generated stage as complete
+        self.state = {
+            "generated": True,
+            "ingested": False,
+            "processed": False,
+            "archived": False,
+            "hacked": False
+        }
         
         # Report success
         console.print(f"[green]✅ Signal Locked.[/green] New Target: [bold]{pid}[/bold]")  # Prints success and the product ID
@@ -288,7 +294,7 @@ class InteractiveSession:
         
         with console.status("[cyan]Performing Secure Ingestion...[/cyan]"):  # Starts a Rich status spinner context
             # Call the Ingestion component logic
-            path = self.ingest.ingest_product(self.active_product)  # Calls the ingestion manager and captures the path
+            path = self.ingestion_manager.ingest_product(self.active_product)  # Calls the ingestion manager and captures the path
         
         if path:  # Checks if a valid path was returned
             # Success: Mark state
@@ -342,11 +348,11 @@ class InteractiveSession:
         if not self.check_prereq("processed", "Archive"): return  # Returns early if processing is incomplete
         
         console.print("[dim italic]ℹ️  Executing Fernet encryption and replicating to backup...[/dim italic]")  # Prints archiving explanation
-        with console.status("[cyan]Vaulting Product...[/cyan]", spinner="lock"):  # Starts a Rich status spinner context
+        with console.status("[cyan]Vaulting Product...[/cyan]", spinner="dots"):  # Starts a Rich status spinner context
             time.sleep(1.5)  # Sleeps to simulate archiving time
             
             # 1. Move to Encrypted Archive
-            self.archive.archive_product(self.active_product)  # Calls archive_product to encrypt and store the product
+            self.archive_manager.archive_product(self.active_product)  # Calls archive_product to encrypt and store the product
             
             # 2. Immediately create a redundant backup for resilience
             self.backup.create_backup(self.active_product)  # Calls create_backup to replicate the encrypted file
@@ -437,14 +443,15 @@ class InteractiveSession:
         while True:
             try:
                 # Repaint the UI banner each time
-                self.print_banner()
+                # self.print_banner() -> REMOVED: Redundant, handled by clear()
+
                 
                 # Prompt the operator for the next command
-                cmd = Prompt.ask("MISSION_CONTROL> ").strip().lower()  # Prompts for a command and normalizes it
+                cmd = Prompt.ask("\nMISSION_CONTROL> ").strip().lower()  # Prompts for a command and normalizes it
                 
                 # --- COMMAND DISPATCHER ---
                 if cmd == "exit":  # Checks for the exit command
-                    console.print("[bold]Console Session Terminated.[/bold]")  # Prints termination message
+                    console.print("[bold]Console Session Terminated.[/bold]\n")  # Prints termination message
                     break  # Breaks the loop to exit
                 
                 elif cmd == "help":  # Checks for the help command

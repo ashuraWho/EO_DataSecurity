@@ -66,7 +66,7 @@ ROLES = {
     # 'admin' role: The highest level of trust. Can manage the security core itself.
     "admin": {
         "description": "Full system control including security management",
-        "permissions": ["read", "write", "delete", "manage_keys"]
+        "permissions": ["read", "write", "delete", "manage_keys", "process"]
     },
     # 'analyst' role: Trusted to process and view data, but cannot delete archives.
     "analyst": {
