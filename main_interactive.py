@@ -49,12 +49,13 @@ class InteractiveSession:
         self.active_product = None  # Stores the ID of the product currently being processed
 
         # --- COMPONENT INSTANTIATION ---
-        self.source = EOSimulator()
-        self.ingest = IngestionManager()
-        self.processor = ProcessingEngine()
-        self.archive = ArchiveManager()
-        self.ac = AccessController()
-        self.backup = ResilienceManager()
+        # We rename these attributes to avoid shadowing the command methods (e.g., self.ingest())
+        self.source_tool = EOSimulator()
+        self.ingest_tool = IngestionManager()
+        self.processor_tool = ProcessingEngine()
+        self.archive_tool = ArchiveManager()
+        self.ac_tool = AccessController()
+        self.backup_tool = ResilienceManager()
 
         # --- PIPELINE TRACKING ---
         # This dictionary tracks the completion status of each lifecycle stage
@@ -173,7 +174,7 @@ class InteractiveSession:
         user = Prompt.ask("\nEnter Username")
 
         # Call the Access Controller to verify credentials and retrieve role
-        role = self.ac.authenticate(user)
+        role = self.ac_tool.authenticate(user)
 
         if role:
             # Update the session state upon success
@@ -197,7 +198,7 @@ class InteractiveSession:
             return False
 
         # Step 2: Query the Access Controller for granular permission check
-        if self.ac.authorize(self.current_user, action):
+        if self.ac_tool.authorize(self.current_user, action):
             # Permission granted
             return True
         else:
@@ -237,7 +238,7 @@ class InteractiveSession:
         with console.status("[cyan]Listening for satellite downlink signal...[/cyan]", spinner="earth"):
             time.sleep(2) # Simulate the duration of a signal pass
             # Call the Simulator component to create files on disk
-            self.source.generate_product(pid)
+            self.source_tool.generate_product(pid)
 
         # Update session state
         self.active_product = pid
@@ -261,7 +262,7 @@ class InteractiveSession:
 
         with console.status("[cyan]Performing Secure Ingestion...[/cyan]"):
             # Call the Ingestion component logic
-            path = self.ingest.ingest_product(self.active_product)
+            path = self.ingest_tool.ingest_product(self.active_product)
 
         if path:
             # Success: Mark state
@@ -285,7 +286,7 @@ class InteractiveSession:
         with console.status("[cyan]Processing Level-0 -> Level-1...[/cyan]", spinner="dots"):
             time.sleep(1.5) # Simulate computation time
             # Call the Processing component
-            path = self.processor.process_product(self.active_product)
+            path = self.processor_tool.process_product(self.active_product)
 
         if path:
             # Success
@@ -306,12 +307,12 @@ class InteractiveSession:
         if not self.check_prereq("processed", "Archive"): return
 
         console.print("[dim italic]ℹ  Executing AES-256 encryption and replicating to backup...[/dim italic]")
-        with console.status("[cyan]Vaulting Product...[/cyan]", spinner="lock"):
+        with console.status("[cyan]Vaulting Product...[/cyan]", spinner="dots"):
             time.sleep(1.5)
             # 1. Move to Encrypted Archive
-            self.archive.archive_product(self.active_product)
+            self.archive_tool.archive_product(self.active_product)
             # 2. Immediately create a redundant backup for resilience
-            self.backup.create_backup(self.active_product)
+            self.backup_tool.create_backup(self.active_product)
 
         # Update state
         self.state["archived"] = True
@@ -361,10 +362,10 @@ class InteractiveSession:
             # Calculate the hash of the backup (trusted copy)
             return security.calculate_hash(bk_path)
 
-        with console.status("[green]Healing System...[/green]", spinner="material"):
+        with console.status("[green]Healing System...[/green]", spinner="dots"):
             time.sleep(2) # Simulate audit and data transfer time
             # Trigger the Resilience Manager's recovery logic
-            fixed = self.backup.verify_and_restore(self.active_product, get_expected_hash)
+            fixed = self.backup_tool.verify_and_restore(self.active_product, get_expected_hash)
 
         if fixed:
             # Success: Corruption repaired
