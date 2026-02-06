@@ -347,9 +347,7 @@ the system immediately performs a set of automated initialization tasks:
     - The system then enters Mission Control mode.
 
 ### 11.2.  Mission Control Console
-The operator is presented with an interactive prompt:
-
-```MISSION_CONTROL> _```
+The operator is presented with an interactive prompt: ```MISSION_CONTROL> _```
 
 At this stage:
 - The program is running inside an event loop, waiting for operator commands.
@@ -362,12 +360,12 @@ Sensitive operations are protected by access control.
 2. **System Behavior**:
     - The system displays the list of predefined identities (configured in `config.py`):
 
-    | **User** | **Role** | **Description** |
-    | :--- | :--- | :--- |
-    | **emanuele_admin** | Admin | Full privileges, including disaster recovery |
-    | **bob_analyst** | Analyst | Processing and archiving permissions |
-    | **charlie_user** | User | Read-only access |
-    | **eve_hacker** | None | Explicitly unauthorized identity |
+        | **User** | **Role** | **Description** |
+        | :--- | :--- | :--- |
+        | **emanuele_admin** | Admin | Full privileges, including disaster recovery |
+        | **bob_analyst** | Analyst | Processing and archiving permissions |
+        | **charlie_user** | User | Read-only access |
+        | **eve_hacker** | None | Explicitly unauthorized identity |
 
     - The operator selects a username.
 	- Authentication and role assignment are enforced.
@@ -442,8 +440,8 @@ This demonstrates automated resilience and self-healing behavior.
 
 ### 11.9. Utility Commands
 
-- `status`: Displays a summary table showing which lifecycle stages have been completed.
-- `help`: Displays the full list of available commands.
+- `status` : Displays a summary table showing which lifecycle stages have been completed.
+- `help` : Displays the full list of available commands.
 
 ### 11.10. Typical Operational Flow
 A standard secure EO workflow follows this sequence:
