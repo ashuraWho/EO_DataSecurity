@@ -360,15 +360,17 @@ Sensitive operations are protected by access control.
 2. **System Behavior**:
     - The system displays the list of predefined identities (configured in `config.py`):
 
-        | **User** | **Role** | **Description** |
-        | :--- | :--- | :--- |
-        | **emanuele_admin** | Admin | Full privileges, including disaster recovery |
-        | **bob_analyst** | Analyst | Processing and archiving permissions |
-        | **charlie_user** | User | Read-only access |
-        | **eve_hacker** | None | Explicitly unauthorized identity |
 
-    - The operator selects a username.
+        | **User** | **Role** | **Password (Demo)** | **Description** |
+        | :--- | :--- | :--- | :--- |
+        | **admin** | Admin | `admin123` | Full privileges, including disaster recovery |
+        | **analyst** | Analyst | `analyst123` | Processing and archiving permissions |
+        | **user** | User | `user123` | Read-only access |
+        | **hacker** | None | `hacker123` | Explicitly unauthorized identity (Banned) |
+
+    - The operator selects a username and enters the password (hidden input).
 	- Authentication and role assignment are enforced.
+	- **Note:** Passwords are now hashed using `bcrypt` for security.
 	- All subsequent actions are authorized based on the assigned role.
 
 ### 11.4. EO Data Generation (scan)
@@ -438,6 +440,18 @@ This represents a disk-level or malicious tampering scenario.
 
 This demonstrates automated resilience and self-healing behavior.
 
+#### 11.8.3. Intrusion Detection (ids)
+```ids```
+- The operator scans the `audit.log` for suspicious patterns.
+- If an attack (like the `hack` above) or brute force attempt occurred, it is flagged.
+- A critical alert is displayed on the console.
+
+#### 11.8.4. Key Rotation (rotate_keys) — Admin Only
+```rotate_keys```
+- Start the key rotation process.
+- All encrypted files are re-encrypted with a new `secret.key`.
+- Essential for post-incident recovery.
+
 ### 11.9. Utility Commands
 
 - `status` : Displays a summary table showing which lifecycle stages have been completed.
@@ -450,7 +464,11 @@ A standard secure EO workflow follows this sequence:
 
 Security testing can then be performed using:
 
-`hack` → `recover`
+`login` → `scan` → `ingest` → `process` → `archive`
+
+Security testing can then be performed using:
+
+`hack` → `ids` → `recover` → `rotate_keys`
 
 ---
 
@@ -496,8 +514,10 @@ All runtime artifacts live under `simulation_data/`:
 7. `archive` Encrypt and vault data.
 8. `hack` Simulate corruption of archive data.
 9. `recover` Verify and restore from backup.
-10. `status` Show lifecycle status.
-12. `exit` Quit the console.
+11. `rotate_keys` Re-encrypt the archive with a fresh key (Admin only).
+12. `ids` Scan audit logs for intrusion patterns.
+13. `status` Show lifecycle status.
+14. `exit` Quit the console.
 
 ---
 
@@ -533,7 +553,132 @@ This repository is an educational prototype. Version numbers reflect feature mat
 
 ---
 
-## 20. Attribution
+## 20. Developer Guide (New Features)
+This project now includes industry-standard development tools.
+
+### 20.1. Running Automated Tests
+We use `pytest` for unit testing the Ingestion and Security modules.
+```bash
+make test
+```
+Or manually:
+```bash
+python -m pytest tests/ -v
+```
+
+### 20.2. Running with Docker
+You can run the entire pipeline inside a container to ensure environment consistency.
+1. **Build the image**:
+    ```bash
+    docker build -t eo-pipeline .
+    ```
+2. **Run the container**:
+    ```bash
+    docker run -it eo-pipeline
+    ```
+
+### 20.3. Project Management (Makefile)
+- `make install`: Install all dependencies (including dev).
+- `make test`: Run the test suite.
+- `make run`: Launch the interactive console.
+- `make clean`: Remove all simulation data and logs.
+
+
+
+### 20.4. Code Quality (Linting)
+To ensure the code adheres to PEP 8 standards and best practices, we use `flake8`.
+```bash
+make lint
+```
+This command checks for syntax errors, undefined names, and standard formatting issues.
+
+### 20.5. Audit Logging
+A persistent audit trail is now saved to `audit.log` in the project root. This file records all security-critical events (login, ingestion, errors) for forensic analysis.
+
+---
+
+## 21. Feature Showcase
+
+### 21.1. Dynamic User Interface
+The console now uses **rich** progress bars and animations to simulate realistic satellite operations.
+- **Acquisition**: Visualizes X-Band downlink progress.
+- **Processing**: Visualizes radiometric calibration steps.
+
+### 21.2. Cryptographic Key Rotation
+A critical enterprise security feature. The `rotate_keys` command:
+1. Generates a fresh AES-256 key.
+2. Decrypts every `.enc` file in the archive and backup zones using the *old* key.
+3. Re-encrypts them with the *new* key.
+4. Securely overwrites `secret.key`.
+
+This allows the system to recover from potential key compromise without losing data.
+
+This allows the system to recover from potential key compromise without losing data.
+
+### 21.3. Intrusion Detection System (IDS)
+Actively hunts for threats in the `audit.log`. The `ids` command uses pattern matching to detect:
+- **Brute Force Attacks**: Multiple failed login attempts.
+- **Insider Threats**: Activity from known blacklisted users (`hacker`).
+- **Data Tampering**: Confirmed corruption events on the archive.
+
+It produces a color-coded threat report, simulating a Security Operations Center (SOC) dashboard.
+
+---
+
+## 22. Security Competency Matrix (Project Rationale)
+This project is engineered as a **"Vertical Slice"** of a real-world secure system. It is not just a collection of scripts, but a holistic demonstration of how abstract cybersecurity competencies translate into working code.
+
+It provides concrete evidence of proficiency in the following areas:
+
+### 22.1. Risk Management (ISO 27005, EBIOS)
+**The Concept**: Identifying risks and implementing proportionate controls.
+**In This Project**: The architecture is built on a specific Threat Model (see §12). Every line of code answers a specific risk:
+- Risk: Confidentiality Loss $\rightarrow$ Mitigation: **Encryption Agnostic** (`security.py`).
+- Risk: Integrity Loss $\rightarrow$ Mitigation: **Hashing SHA-256** (`ingestion.py`).
+- Risk: Availability Loss $\rightarrow$ Mitigation: **Backup & Restore Logic** (`resilience`).
+
+### 22.2. ISMS Governance (ISO 27001)
+**The Concept**: Governing security through policies and controls.
+**In This Project**: The code implements key controls from **ISO 27001 Annex A**:
+- **A.9 Access Control**: Implemented via the RBAC system in `config.py`.
+- **A.10 Cryptography**: Managed via the `rotate_keys` command and secure key storage.
+- **A.12 Operations Security**: Demonstrated through the comprehensive `audit.log`.
+- **A.14 System Acquisition**: Enforced by input validation in `ingestion.py`.
+
+### 22.3. Security Architecture
+**The Concept**: Designing systems that are secure by design.
+**In This Project**:
+- **Defense in Depth**: Multiple layers of security (Authentication $\rightarrow$ Authorization $\rightarrow$ Encryption $\rightarrow$ Hashing $\rightarrow$ Backup).
+- **Network Segmentation**: Simulated by the "Trust Zones" (Ingest, Staging, Archive), which mimic physical network segregation.
+- **Intrusion Detection**: The `ids.py` component acts as a host-based IDS, analyzing logs for patterns.
+
+### 22.4. Verification & Testing
+**The Concept**: Proving that security controls work.
+**In This Project**:
+- **SAST (Static Analysis)**: `flake8` integration ensures code quality and adherence to standards.
+- **DAST (Dynamic Analysis)**: `pytest` suites verify security logic at runtime.
+- **Penetration Testing**: The `hack` command simulates an active exploit (Data Tampering), and `recover` validates the incident response.
+
+### 22.5. Threat Intelligence (MITRE ATT&CK)
+**The Concept**: Understanding adversary tactics.
+**In This Project**: The IDS is explicitly designed to detect specific MITRE techniques:
+- **T1110 (Brute Force)**: Detected by monitoring consecutive login failures.
+- **T1078 (Valid Accounts)**: Detected by identifying activity from known compromised accounts (`hacker`).
+- **T1485 (Data Destruction)**: Mitigated by the automated interactions between the Archive and Backup systems.
+
+---
+
+| **Competency Area** | **Framework / Standard** | **Project Implementation** |
+| :--- | :--- | :--- |
+| **Risk Management** | **ISO 27005, EBIOS** | • Threat Modeling & Risk-based controls |
+| **ISMS Governance** | **ISO 27001 (Annex A)** | • A.9, A.10, A.12, A.14 controls |
+| **Security Architecture** | **NIST CSF, TOGAF** | • Defense in Depth, Segmentation, IDS |
+| **Verification & Testing** | **SAST / DAST / Pentest** | • Linting, Unit Tests, Attack Simulation |
+| **Threat Intelligence** | **MITRE ATT&CK / ATLAS** | • Detection of T1110, T1078, T1485 |
+
+---
+
+## 23. Attribution
 - **Author**: Emanuele Anzellotti 
 - **Type**: Educational / Concept Validation Prototype 
 - **Target Domain**: EO Ground Segment Security

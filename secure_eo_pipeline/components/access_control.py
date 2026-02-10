@@ -17,6 +17,8 @@ from secure_eo_pipeline.utils.logger import audit_log  # For security events
 # get the update immediately without manual error.
 # =============================================================================
 
+import bcrypt  # For password verification
+
 class AccessController:
     
     """
@@ -24,36 +26,51 @@ class AccessController:
     Provides two distinct services: Authentication (Who are you?) and Authorization (What can you do?).
     """
 
-    def authenticate(self, username):
+    def authenticate(self, username, password):
         
         """
         Validates the identity of the user.
         
         ARGUMENTS:
             username (str): The identifier provided by the user.
+            password (str): The secret password to verify.
             
         LOGIC:
         Checks the mock 'database' in config.py.
-        - If found: returns the user's role.
-        - If not found: returns None (Access Denied).
+        - If user not found: Fail.
+        - If password hash mismatch: Fail.
+        - If verified: Return role.
         """
         
-        # Step 1: Query the user dictionary for the provided username
-        # .get() is safer than direct access because it doesn't crash if the key is missing
-        role = config.USERS.get(username)  # Looks up the user role with `.get`
+        # Step 1: Query the user database for the provided username
+        user_record = config.USERS_DB.get(username)
         
-        # Step 2: Treat missing or explicitly unprivileged roles as authentication failures
-        if not role or role == "none":  # Checks for missing role or `none`
-            # Case A: User is unknown or explicitly blocked
-            # RATIONALE: Warning logs alert security admins of potential intrusion.
-            audit_log.warning(f"[AUTH] FAILURE: Invalid login attempt for '{username}'.")  # Logs a failure for invalid login
-            # Return None to indicate identity could not be verified
+        # Step 2: Treat missing users as authentication failures
+        if not user_record:
+            # Case A: User is unknown
+            # RATIONALE: We use generic error messages in logs? No, logs should be specific.
+            # User facing errors should be generic ("Invalid credentials") to prevent enumeration.
+            audit_log.warning(f"[AUTH] FAILURE: Unknown user '{username}'.")
             return None
+            
+        # Step 3: Verify the password against the stored bcrypt hash
+        stored_hash = user_record["hash"].encode('utf-8')
+        role = user_record["role"]
         
-        # Case B: User is known and has a valid role. Log success.
-        audit_log.info(f"[AUTH] SUCCESS: User '{username}' identified as '{role}'.")  # Logs successful authentication
-        # Return the role string (e.g., 'admin', 'analyst')
-        return role
+        if role == "none":
+             audit_log.warning(f"[AUTH] FAILURE: User '{username}' is disabled/banned.")
+             return None
+
+        # Check password
+        # bcrypt.checkpw requires bytes for both arguments
+        if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
+            # Case B: Password matches. Log success.
+            audit_log.info(f"[AUTH] SUCCESS: User '{username}' identified as '{role}'.")
+            return role
+        else:
+            # Case C: Password mismatch
+            audit_log.warning(f"[AUTH] FAILURE: Invalid password for '{username}'.")
+            return None
 
 
 
@@ -70,14 +87,18 @@ class AccessController:
         Enforce the principle of "Least Privilege".
         """
         
-        # Step 1: Who is this? We call authenticate() to get their role.
-        role_name = self.authenticate(username)  # Authenticates the user to get their role
+        # NOTE: In a stateful session (like CLI), we usually don't re-authenticate with password
+        # for every single action. We trust the 'current_role' stored in session (main.py).
+        # However, for this specific class design, we need to look up the role from the username.
         
-        # Step 2: Immediate denial if authentication failed (No ID = No Access)
-        if not role_name:  # Returns False when not authenticated
-            # Return False to the calling function (Operation Blocked)
+        # Lookup role directly from DB (simulating a session token check)
+        user_record = config.USERS_DB.get(username)
+        
+        if not user_record:
             return False
             
+        role_name = user_record["role"]
+        
         # Step 3: Map the Role Name to its detailed definition in the config
         # This tells us exactly what permissions this role holds.
         role_def = config.ROLES.get(role_name)  # Looks up the role definition

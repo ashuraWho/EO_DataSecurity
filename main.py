@@ -7,6 +7,7 @@ from rich.console import Console  # To handle styled terminal output
 from rich.panel import Panel  # To draw boxed UI elements
 from rich.table import Table  # To format tabular output
 from rich.prompt import Prompt  # To collect interactive input
+from rich.progress import track  # For hacker-style progress bars
 
 from secure_eo_pipeline import config  # For shared settings like directories and users
 from secure_eo_pipeline.components.data_source import EOSimulator  # To generate synthetic products
@@ -15,7 +16,9 @@ from secure_eo_pipeline.components.processing import ProcessingEngine  # To appl
 from secure_eo_pipeline.components.storage import ArchiveManager  # To encrypt and store products
 from secure_eo_pipeline.components.access_control import AccessController  # For authentication and authorization
 from secure_eo_pipeline.resilience.backup_system import ResilienceManager  # To back up and restore files
+from secure_eo_pipeline.resilience.backup_system import ResilienceManager  # To back up and restore files
 from secure_eo_pipeline.utils import security  # For hashing in recovery logic
+from secure_eo_pipeline.components.ids import IntrusionDetectionSystem # For log analysis
 
 # Create a global Rich Console for all printing operations
 console = Console()
@@ -43,7 +46,9 @@ class InteractiveSession:
         self.processor = ProcessingEngine()  # Creates a processing engine to perform QC and calibration
         self.archive_manager = ArchiveManager()  # Creates an archive manager to encrypt and store data
         self.ac = AccessController()  # Creates an access controller for RBAC checks (Role-Based Access Control)
+        self.ac = AccessController()  # Creates an access controller for RBAC checks (Role-Based Access Control)
         self.backup = ResilienceManager()  # Creates a resilience manager for backup and recovery
+        self.ids = IntrusionDetectionSystem()  # Creates an intrusion detection system for log analysis
         
         # --- PIPELINE TRACKING ---
         # This dictionary tracks the completion status of each lifecycle stage
@@ -115,7 +120,7 @@ class InteractiveSession:
         """
         
         # Create a table to organize commands and descriptions
-        table = Table(title="Available Operator Commands", box=None)
+        table = Table(title="\nAvailable Operator Commands\n", box=None)
         
         # Define the header columns
         table.add_column("Command", style="bold cyan")  # Adds the Command column with cyan style
@@ -130,6 +135,8 @@ class InteractiveSession:
         table.add_row("archive", "Apply Fernet encryption and vault data")
         table.add_row("hack", "SIMULATION: Corrupt the primary archive disk")
         table.add_row("recover", "Trigger automated hash-audit and repair")
+        table.add_row("rotate_keys", "SECURITY: Re-encrypt archive with new keys (Admin)")
+        table.add_row("ids", "SECURITY: Scan logs for intrusion patterns")
         table.add_row("status", "Show lifecycle checklist for active target")
         table.add_row("exit", "Close the console")
         
@@ -175,14 +182,18 @@ class InteractiveSession:
         
         console.print("\n[bold underline]Mission Personnel Directory:[/bold underline]")  # Prints a header listing valid users
         # Display valid users to assist the simulation operator
-        for u, r in config.USERS.items():  # Iterates over the configured user dictionary
-            console.print(f" - {u} (Role: {r})")  # Prints each user and role to assist the operator
+        for u in config.USERS_DB.keys():  # Iterates over the configured user dictionary
+            console.print(f" - {u}")  # Prints each user and role to assist the operator
             
         # Capture user input
         user = Prompt.ask("\nEnter Username")
         
+        # Capture password securely (hidden input)
+        # We use Console.input with password=True from Rich, or getpass
+        password = console.input("[bold]Enter Password:[/bold] ", password=True)
+        
         # Call the Access Controller to verify credentials and retrieve role
-        role = self.ac.authenticate(user)
+        role = self.ac.authenticate(user, password)
         
         if role:  # Checks if authentication succeeded
             # Update the session state upon success
@@ -191,7 +202,7 @@ class InteractiveSession:
             console.print(f"[green]✅ Access Granted. Welcome, Operator {user}.[/green]")  # Prints an access granted message
         else:  # Else branch for failure
             # Report failure
-            console.print("[red]❌ Access Denied. Identity not recognized.[/red]")  # Prints an access denied message
+            console.print("[red]❌ Access Denied. Identity not recognized or password incorrect.[/red]")  # Prints an access denied message
 
 
 
@@ -256,10 +267,15 @@ class InteractiveSession:
         pid = f"Sentinel_2_{random.randint(1000,9999)}_Orbit{random.randint(10,99)}"  # Builds a randomized product ID string
         
         # Display a high-tech loading spinner
-        with console.status("[cyan]Listening for satellite downlink signal...[/cyan]", spinner="earth"):  # Starts a Rich status spinner context
-            time.sleep(2) # Simulate the duration of a signal pass -> Sleeps to simulate a satellite pass
-            # Call the Simulator component to create files on disk
-            self.source.generate_product(pid)
+        # with console.status("[cyan]Acquiring Satellite Downlink (X-Band)...[/cyan]", spinner="earth"):  # Starts a Rich status spinner context
+        #     time.sleep(2) # Simulate the duration of a signal pass -> Sleeps to simulate a satellite pass
+        #     # Call the Simulator component to create files on disk
+        #     self.source.generate_product(pid)
+
+        # UI Upgrade: Hacker-style progress bar
+        for _ in track(range(20), description="[cyan]Acquiring Satellite Downlink (X-Band)...[/cyan]", spinner="earth"):
+            time.sleep(2)  # 2 seconds total
+        self.source.generate_product(pid)
         
         # Update session state
         self.active_product = pid  # Sets the active product ID
@@ -319,10 +335,16 @@ class InteractiveSession:
         if not self.check_prereq("ingested", "Process"): return  # Returns early if ingestion is incomplete
         
         console.print("[dim italic]ℹ️  Applying radiometric calibration and checking for sensor noise...[/dim italic]")  # Prints processing explanation
-        with console.status("[cyan]Processing Level-0 -> Level-1...[/cyan]", spinner="dots"):  # Starts a Rich status spinner context
-            time.sleep(1.5) # Simulate computation time
-            # Call the Processing component
-            path = self.processor.process_product(self.active_product)  # Calls the processing engine and captures the path
+        console.print("[dim italic]ℹ️  Applying radiometric calibration and checking for sensor noise...[/dim italic]")  # Prints processing explanation
+        # with console.status("[cyan]Calibrating Radiometric Sensors (Level-0 -> Level-1)...[/cyan]", spinner="dots"):  # Starts a Rich status spinner context
+        #     time.sleep(1.5) # Simulate computation time
+        #     # Call the Processing component
+        #     path = self.processor.process_product(self.active_product)  # Calls the processing engine and captures the path
+
+        # UI Upgrade: Progress bar
+        for _ in track(range(15), description="[magenta]Calibrating Radiometric Sensors (Level-0 -> Level-1)...[/magenta]", spinner="dots"):
+            time.sleep(1.5)
+        path = self.processor.process_product(self.active_product)
             
         if path:  # Checks if processing returned a valid path
             # Success
@@ -430,6 +452,67 @@ class InteractiveSession:
              
              
              
+    def rotate_keys(self):
+        """
+        COMMAND: rotate_keys
+        Performs a full cryptographic key rotation.
+        """
+        # Requires high-level 'manage_keys' permission (Admin only)
+        if not self.check_auth("manage_keys"): return
+
+        console.print("[bold red]⚠️  WARNING: KEY ROTATION INITIATED.[/bold red]")
+        console.print("[dim]This will re-encrypt the entire valid archive with a new key.[/dim]")
+        
+        confirm = Prompt.ask("Are you sure? (yes/no)", choices=["yes", "no"], default="no")
+        if confirm == "no":
+            console.print("[yellow]Key rotation cancelled.[/yellow]")
+            return
+
+        with console.status("[bold red]ROTATING SYSTEM KEYS...[/bold red]", spinner="bouncingBall"):
+             success = security.rotate_keys(config.ARCHIVE_DIR, config.BACKUP_DIR)
+
+        if success:
+             console.print("[green]✅ Key Rotation Complete.[/green] New key is active.")
+        else:
+             console.print("[red]❌ Key Rotation Failed.[/red] See logs for details.")
+
+
+    def run_ids(self):
+        """
+        COMMAND: ids
+        Scans audit logs for security incidents.
+        """
+        # Authorization: Analyst or Admin
+        if not self.check_auth("process") and not self.check_auth("manage_keys"): 
+            return
+
+        with console.status("[bold red]SCANNING AUDIT LOGS FOR THREATS...[/bold red]", spinner="bouncingBall"):
+            time.sleep(2)
+            incidents = self.ids.analyze_audit_log()
+
+        if not incidents:
+            console.print("[green]✅ System Secure. No threats detected.[/green]")
+            return
+
+        # Display Report
+        console.print(f"\n[bold red]🚨 THREATS DETECTED: {len(incidents)}[/bold red]")
+        
+        table = Table(title="Intrusion Detection Report", box="heavy_edge")
+        table.add_column("Severity", style="bold")
+        table.add_column("Type", style="cyan")
+        table.add_column("Details", style="white")
+
+        for inc in incidents:
+            sev_style = "red" if inc["severity"] == "CRITICAL" else "yellow" if inc["severity"] == "HIGH" else "blue"
+            table.add_row(
+                f"[{sev_style}]{inc['severity']}[/{sev_style}]",
+                inc["type"],
+                inc["details"]
+            )
+        
+        console.print(table)
+        console.print("[dim]Recommended Action: Review audit.log and rotate keys if necessary.[/dim]\n")
+
     def run(self):  # To start the command loop
         
         """
@@ -447,11 +530,11 @@ class InteractiveSession:
 
                 
                 # Prompt the operator for the next command
-                cmd = Prompt.ask("\nMISSION_CONTROL> ").strip().lower()  # Prompts for a command and normalizes it
+                cmd = Prompt.ask("\n[blink bold cyan]MISSION_CONTROL>[/blink bold cyan] ").strip().lower()  # Prompts for a command and normalizes it
                 
                 # --- COMMAND DISPATCHER ---
                 if cmd == "exit":  # Checks for the exit command
-                    console.print("[bold]Console Session Terminated.[/bold]\n")  # Prints termination message
+                    console.print("[bold green]\nConsole Session Terminated.[/bold green]\n")  # Prints termination message
                     break  # Breaks the loop to exit
                 
                 elif cmd == "help":  # Checks for the help command
@@ -486,6 +569,12 @@ class InteractiveSession:
                     
                 elif cmd == "recover":  # Checks for the recover command
                     self.recover()  # Runs the recovery flow
+                    
+                elif cmd == "rotate_keys":
+                    self.rotate_keys()
+
+                elif cmd == "ids":
+                    self.run_ids()
                     
                 elif cmd == "":  # Checks for empty input
                     pass  # Do nothing for empty input

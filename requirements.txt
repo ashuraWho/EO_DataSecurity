@@ -5,3 +5,9 @@ numpy
 cryptography
 # For beautiful terminal UI
 rich
+# For testing
+pytest
+# For password hashing
+bcrypt
+# For linting
+flake8

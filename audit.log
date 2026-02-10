@@ -1,0 +1,36 @@
+2026-02-08 18:40:00,121 - EO_Pipeline - INFO - [INGEST] START: Received ingestion request for product test_product_001
+2026-02-08 18:40:00,122 - EO_Pipeline - INFO - [INGEST] SUCCESS: Product test_product_001 is verified and staged. Initial Hash: 6fc733a9ce5d0ae3e1ad246fb21e498697a75694e5957f03b687bca628d12f56
+2026-02-08 18:40:00,124 - EO_Pipeline - INFO - [INGEST] START: Received ingestion request for product missing_data_product
+2026-02-08 18:40:00,124 - EO_Pipeline - ERROR - [INGEST] FAILED: Incomplete product. Missing files for missing_data_product.
+2026-02-08 18:40:00,126 - EO_Pipeline - INFO - [INGEST] START: Received ingestion request for product bad_schema_product
+2026-02-08 18:40:00,126 - EO_Pipeline - ERROR - [INGEST] FAILED: Schema validation failed for bad_schema_product. Error: Missing mandatory fields: {'sensor'}
+2026-02-08 19:08:14,338 - EO_Pipeline - WARNING - [AUTH] FAILURE: User 'eve_hacker' is disabled/banned.
+2026-02-08 19:08:14,561 - EO_Pipeline - WARNING - [AUTH] FAILURE: Invalid password for 'emanuele_admin'.
+2026-02-08 19:08:14,561 - EO_Pipeline - WARNING - [AUTH] FAILURE: Unknown user 'unknown_ghost'.
+2026-02-08 19:08:14,789 - EO_Pipeline - INFO - [AUTH] SUCCESS: User 'emanuele_admin' identified as 'admin'.
+2026-02-08 19:11:46,426 - EO_Pipeline - WARNING - [AUTH] FAILURE: Invalid password for 'emanuele_admin'.
+2026-02-08 19:55:22,785 - EO_Pipeline - WARNING - [AUTH] FAILURE: User 'hacker' is disabled/banned.
+2026-02-08 19:55:36,940 - EO_Pipeline - INFO - [AUTH] SUCCESS: User 'admin' identified as 'admin'.
+2026-02-08 19:56:04,310 - EO_Pipeline - INFO - [SOURCE] START: Generating simulated satellite product: Sentinel_2_7537_Orbit54
+2026-02-08 19:56:04,413 - EO_Pipeline - INFO - [SOURCE] SUCCESS: Product files saved to: simulation_data/ingest_landing_zone
+2026-02-08 19:57:30,923 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'process'.
+2026-02-08 19:57:30,931 - EO_Pipeline - INFO - [INGEST] START: Received ingestion request for product Sentinel_2_7537_Orbit54
+2026-02-08 19:57:30,936 - EO_Pipeline - INFO - [INGEST] SUCCESS: Product Sentinel_2_7537_Orbit54 is verified and staged. Initial Hash: 8c61a99882f8c583506a103e3a6a23370954e1e17eee1f686b6940a1a733f5a6
+2026-02-08 19:57:52,656 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'process'.
+2026-02-08 19:57:54,217 - EO_Pipeline - INFO - [PROCESS] START: Processing Level-0 -> Level-1 for Sentinel_2_7537_Orbit54
+2026-02-08 19:57:54,228 - EO_Pipeline - INFO - [PROCESS] SUCCESS: Sentinel_2_7537_Orbit54 is now Level-1 certified. New Hash: 8c61a99882f8c583506a103e3a6a23370954e1e17eee1f686b6940a1a733f5a6
+2026-02-08 19:58:49,944 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'write'.
+2026-02-08 19:58:51,451 - EO_Pipeline - INFO - [ARCHIVE] START: Securing product Sentinel_2_7537_Orbit54 in the vault...
+2026-02-08 19:58:51,473 - EO_Pipeline - INFO - [ARCHIVE] SUCCESS: Product Sentinel_2_7537_Orbit54 is now encrypted and vaulted.
+2026-02-08 19:58:51,474 - EO_Pipeline - INFO - [BACKUP] SUCCESS: Redundant copy created for product Sentinel_2_7537_Orbit54
+2026-02-08 19:59:48,473 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'process'.
+2026-02-08 20:01:04,846 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'manage_keys'.
+2026-02-08 20:01:06,856 - EO_Pipeline - INFO - [RESILIENCE] Initiating integrity audit for Sentinel_2_7537_Orbit54...
+2026-02-08 20:01:06,860 - EO_Pipeline - ERROR - [RESILIENCE] INTEGRITY FAILURE: Hash mismatch detected for Sentinel_2_7537_Orbit54!
+2026-02-08 20:01:06,860 - EO_Pipeline - INFO - [RESILIENCE] Attempting automated self-healing from backup...
+2026-02-08 20:01:06,863 - EO_Pipeline - INFO - [RESILIENCE] SUCCESS: Product Sentinel_2_7537_Orbit54 restored and healed.
+2026-02-08 20:01:30,416 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'manage_keys'.
+2026-02-08 20:06:50,493 - EO_Pipeline - INFO - [AUTH] SUCCESS: User 'admin' identified as 'admin'.
+2026-02-08 20:08:01,035 - EO_Pipeline - INFO - [AUTH] SUCCESS: User 'admin' identified as 'admin'.
+2026-02-08 20:08:31,469 - EO_Pipeline - INFO - [SOURCE] START: Generating simulated satellite product: Sentinel_2_7465_Orbit29
+2026-02-08 20:08:31,516 - EO_Pipeline - INFO - [SOURCE] SUCCESS: Product files saved to: simulation_data/ingest_landing_zone

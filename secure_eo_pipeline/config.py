@@ -83,16 +83,29 @@ ROLES = {
 # -----------------------------------------------------------------------------
 # 3. USER DATABASE (MOCK)
 # -----------------------------------------------------------------------------
-# This maps specific user identities to their assigned roles.
-# In a real environment, this data would come from Active Directory.
+# This maps specific user identities to their assigned roles AND credentials.
+# In a real environment, this data would come from Active Directory or LDAP.
+# Passwords are hashed using bcrypt (cost=12).
 # -----------------------------------------------------------------------------
-USERS = {
-    # 'emanuele_admin' is assigned the 'admin' role (Full Power)
-    "emanuele_admin": "admin",      
-    # 'bob_analyst' is assigned the 'analyst' role (Can process data)
-    "bob_analyst": "analyst",    
-    # 'charlie_user' is assigned the 'user' role (Can only read)
-    "charlie_user": "user",      
-    # 'eve_hacker' has no valid role, representing an unauthorized intruder
-    "eve_hacker": "none"         
+USERS_DB = {
+    "admin": {
+        "role": "admin",
+        # Password: 'admin123'
+        "hash": "$2b$12$.j6hylB2lfkMScxLz2HmReYWunW9hw/EbEPqHbWyr/xoh/JeMMCrC"
+    },
+    "analyst": {
+        "role": "analyst",
+        # Password: 'analyst123'
+        "hash": "$2b$12$zpYrnnORDu54zjAFdfdTF.YX1gXL5dnfu2oNNZ2G3//x9X9tk6z.6"
+    },
+    "user": {
+        "role": "user",
+        # Password: 'user123'
+        "hash": "$2b$12$cZXqc.jcZrzeIoxmNyWHN.4l0iQ7ZRhulB64yvKPK5NgbJ6oSjjrG"
+    },
+    "hacker": {
+        "role": "none",
+        # Password: 'hacker123' (Not that it matters, she has no role)
+        "hash": "$2b$12$m8kxNIoCKQmSytgMD/dJOeB34uiYSFM38DcKCJcuBAaqXy5ROaZUa"
+    }
 }

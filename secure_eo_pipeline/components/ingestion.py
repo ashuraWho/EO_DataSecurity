@@ -1,6 +1,7 @@
 import os  # For filesystem operations
 import json  # For metadata parsing
 import shutil  # For file copying
+from typing import Optional
 
 from secure_eo_pipeline import config  # For directory paths
 from secure_eo_pipeline.utils import security  # For hashing
@@ -27,7 +28,7 @@ class IngestionManager:
     Handles the secure intake and validation of newly arrived EO products.
     """
 
-    def ingest_product(self, product_id):
+    def ingest_product(self, product_id: str) -> Optional[str]:
         
         """
         Validates, fingerprints, and registers a product for internal use.

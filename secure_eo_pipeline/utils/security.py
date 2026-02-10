@@ -17,7 +17,9 @@ from secure_eo_pipeline import config  # For key file path
 # Encryption ensures that sensitive or proprietary data remains confidential.
 # =============================================================================
 
-def generate_key():
+from typing import Optional
+
+def generate_key() -> None:
     
     """
     Generates a new 256-bit symmetric encryption key and saves it to a file.
@@ -53,7 +55,7 @@ def generate_key():
 
 
 
-def load_key():
+def load_key() -> bytes:
     
     """
     Retrieves the existing encryption key from the filesystem.
@@ -84,7 +86,7 @@ def load_key():
 
 
 
-def encrypt_file(file_path):
+def encrypt_file(file_path: str) -> None:
     
     """
     Transforms a readable file into an encrypted blob of data.
@@ -126,7 +128,7 @@ def encrypt_file(file_path):
 
 
 
-def decrypt_file(file_path):
+def decrypt_file(file_path: str) -> None:
     
     """
     Restores an encrypted file back to its original readable state.
@@ -167,7 +169,7 @@ def decrypt_file(file_path):
 
 
 
-def calculate_hash(file_path):
+def calculate_hash(file_path: str) -> Optional[str]:
     
     """
     Generates a SHA-256 'Digital Fingerprint' of any file.
@@ -204,3 +206,89 @@ def calculate_hash(file_path):
         # If the file isn't there, we can't hash it
         print(f"[SECURITY CORE] ERROR: Cannot calculate hash. {file_path} not found.")
         return None
+
+def rotate_keys(archive_dir: str, backup_dir: str) -> bool:
+    """
+    Performs a full cryptographic key rotation.
+    
+    PROCESS:
+    1. Load the OLD key.
+    2. Generate a NEW key (in memory).
+    3. Re-encrypt all data in Archive and Backup with the NEW key.
+    4. Overwrite the key file on disk.
+    
+    RETURNS:
+        bool: True if successful, False if critical error occurred.
+    """
+    print("[CRYPTO] STARTING KEY ROTATION SEQUENCE...")
+    
+    # 1. Load the current (soon to be old) key
+    try:
+        old_key_bytes = load_key()
+        old_fernet = Fernet(old_key_bytes)
+    except Exception as e:
+        print(f"[CRYPTO] FATAL: Could not load current key: {e}")
+        return False
+
+    # 2. Generate new key
+    new_key_bytes = Fernet.generate_key()
+    new_fernet = Fernet(new_key_bytes)
+    print("[CRYPTO] New key generated in memory.")
+
+    # 3. Identify all encrypted files
+    # We need to process both the primary archive and the backup
+    targets = []
+    for d in [archive_dir, backup_dir]:
+        if os.path.exists(d):
+            for f in os.listdir(d):
+                if f.endswith(".enc"):
+                    targets.append(os.path.join(d, f))
+    
+    print(f"[CRYPTO] Found {len(targets)} encrypted objects to migrate.")
+
+    # 4. Re-encrypt loop
+    # NOTE: In a production system, this should be atomic.
+    # If it crashes halfway, we'd have half files with key A and half with key B.
+    # Here, for education, we assume happy path or manual recovery.
+    success_count = 0
+    for file_path in targets:
+        try:
+            # Read ciphertext
+            with open(file_path, "rb") as f:
+                cipher_old = f.read()
+            
+            # Decrypt with OLD key
+            plaintext = old_fernet.decrypt(cipher_old)
+            
+            # Encrypt with NEW key
+            cipher_new = new_fernet.encrypt(plaintext)
+            
+            # Write back
+            with open(file_path, "wb") as f:
+                f.write(cipher_new)
+            
+            success_count += 1
+            # Optional: print(f"  > Migrated {os.path.basename(file_path)}")
+            
+        except Exception as e:
+            print(f"[CRYPTO] ERROR migrating {file_path}: {e}")
+            # If we fail to re-encrypt a file, do we stop? 
+            # For this prototype, yes, to avoid a mess.
+            print("[CRYPTO] ABORTING ROTATION to prevent data loss.")
+            return False
+
+    if success_count < len(targets):
+        print("[CRYPTO] Warning: Not all files were migrated. Old key still active on disk.")
+        return False
+
+    # 5. Commit new key to disk
+    try:
+        with open(config.KEY_PATH, "wb") as f:
+            f.write(new_key_bytes)
+        print("[CRYPTO] SUCCESS: New key committed to keystore.")
+        return True
+    except Exception as e:
+        print(f"[CRYPTO] CRITICAL: Re-encryption done but failed to save new key: {e}")
+        print(f"[CRYPTO] EMERGENCY DUMP OF NEW KEY: {new_key_bytes.decode()}")
+        return False
+
