@@ -1,6 +1,9 @@
 import logging  # For audit trail
 import sys  # For stdout
 
+from secure_eo_pipeline import config
+from secure_eo_pipeline.db import sqlite_adapter
+
 # =============================================================================
 # Logging & Audit Module
 # =============================================================================
@@ -13,6 +16,31 @@ import sys  # For stdout
 # 2. Incident Response: If a hack occurs, we use logs to reconstruct the timeline.
 # 3. Non-repudiation: A user cannot deny an action if it is securely logged.
 # =============================================================================
+
+class SQLiteLogHandler(logging.Handler):
+    
+    """
+    Custom logging handler that mirrors audit events into the SQLite database.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            # Best-effort extraction of structured fields from the log record.
+            user = getattr(record, "user", None)
+            action = getattr(record, "action", None)
+            message = self.format(record)
+            sqlite_adapter.insert_audit_event(
+                level=record.levelname,
+                component=record.name,
+                details=message,
+                user=user,
+                action=action,
+            )
+        except Exception:
+            # We deliberately swallow exceptions here to avoid breaking the main
+            # application flow if the DB becomes unavailable.
+            pass
+
 
 def setup_logger(name="EO_Pipeline", log_file="audit.log"):
     
@@ -57,6 +85,13 @@ def setup_logger(name="EO_Pipeline", log_file="audit.log"):
         file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
+
+        # 3. OPTIONAL SQLITE HANDLER (Structured Security Telemetry)
+        # When enabled, every audit event is also mirrored into the SQLite DB.
+        if getattr(config, "USE_SQLITE", False):
+            sqlite_handler = SQLiteLogHandler()
+            sqlite_handler.setFormatter(formatter)
+            logger.addHandler(sqlite_handler)
         
     # Return the fully configured logger object to the caller
     return logger

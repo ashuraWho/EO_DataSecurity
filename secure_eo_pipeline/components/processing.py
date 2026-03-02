@@ -5,6 +5,8 @@ import numpy as np  # For data processing
 from secure_eo_pipeline import config  # For paths
 from secure_eo_pipeline.utils import security  # For hashing
 from secure_eo_pipeline.utils.logger import audit_log  # For event logging
+from secure_eo_pipeline.ml import features as ml_features
+from secure_eo_pipeline.ml import models as ml_models
 
 # =============================================================================
 # Processing & Quality Control Component
@@ -110,6 +112,21 @@ class ProcessingEngine:
         # Clamp the values to a valid range to avoid negative or >1 artifacts
         processed_data = np.clip(processed_data, 0.0, 1.0)  # Clamps values to [0, 1]
         
+        # Optional: ML-based anomaly/quality scoring on the processed data
+        if getattr(config, "USE_ML", False):
+            try:
+                feat = ml_features.extract_eo_features(processed_data)
+                score, reason = ml_models.eo_anomaly_score(feat)
+                meta["ml_score"] = score
+                meta["ml_flag"] = "OK" if score == 0.0 else "ANOMALOUS"
+                meta["ml_reason"] = reason
+                meta["ml_model"] = "threshold_eo_v1"
+                audit_log.info(
+                    f"[ML] EO anomaly score for {product_id}: {score:.3f} (flag={meta['ml_flag']}, reason={reason})"
+                )
+            except Exception as e:
+                audit_log.warning(f"[ML] EO anomaly scoring failed for {product_id}: {e}")
+
         # Step 1: Overwrite the binary file in the staging area with the NEW processed version.
         np.save(input_file, processed_data)  # Saves processed data to the same file
         

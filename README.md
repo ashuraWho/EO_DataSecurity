@@ -45,17 +45,29 @@ These exclusions are intentional. The prototype focuses on correctness of securi
 1. Python 3.8+.
 2. A terminal shell.
 
-### 4.2. Install Dependencies
+### 4.2. Create a Virtual Environment (recommended)
+
+To avoid conflicts with the system Python (for example on macOS with Homebrew and PEP 668), it is strongly recommended to use a virtual environment inside this repository:
+
 ```bash
-pip install -r requirements.txt
+cd EO_DataSecurity
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-### 4.3. Run the Interactive Console
+Once the virtual environment is active your shell prompt will typically show `(.venv)` at the beginning.
+
+### 4.3. Install Dependencies
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 4.4. Run the Interactive Console
 ```bash
 python main.py
 ```
 
-### 4.4. Suggested Demo Flow
+### 4.5. Suggested Demo Flow
 1. `scan`
 2. `login`
 3. `ingest`
@@ -67,6 +79,27 @@ python main.py
 This sequence walks through acquisition → validation → processing → encryption → corruption → recovery.
 
 ---
+
+## 4.6. Hardening Guide (SECURE MODE)
+
+By default the system now starts in **SECURE** mode, which enforces stricter IAM rules.
+
+- **Operating modes**
+  - `EO_PIPELINE_MODE=SECURE` (default): password policy and login lockout enabled.
+  - `EO_PIPELINE_MODE=DEMO`: more relaxed behaviour, useful only for quick demos.
+
+- **Key environment variables**
+  - `EO_PIPELINE_MODE`: `SECURE` / `DEMO`.
+  - `EO_MAX_FAILED_LOGINS`: maximum number of failed login attempts before temporary lockout (default: `5`).
+  - `EO_LOCKOUT_SECONDS`: lockout duration in seconds after too many failed attempts (default: `60`).
+
+- **Recommendations for “serious” use of the demo**
+  1. Keep `EO_PIPELINE_MODE=SECURE` (or set it explicitly).
+  2. Use `user_add` with strong passwords (minimum 8 characters, with upper/lowercase letters, digits, and symbols).
+  3. Keep `USE_SQLITE = True` so that users and the audit trail are persisted in the SQLite database instead of only in memory / flat files.
+  4. Enable `USE_ML = True` if you want to see anomaly scores on EO data and logs (advanced configuration).
+
+In SECURE mode, accounts are temporarily locked after too many failed login attempts and lockout events are recorded in the audit trail.
 
 ## 5. Repository Structure
 1. `main.py` Interactive operator console (CLI) and orchestration.
@@ -244,10 +277,11 @@ Key responsibilities:
 1. Verifies ingestion hash.
 2. Performs QC (NaN rejection).
 3. Normalizes data values.
-4. Updates metadata and hash.
+4. Optionally computes a simple anomaly/quality score over the EO data when ML is enabled.
+5. Updates metadata and hash.
 
 Design rationale:
-- Prevents processing of tampered data and maintains provenance through transformation.
+- Prevents processing of tampered data and maintains provenance through transformation while exposing hooks for quality analytics.
 
 ### 10.6. `secure_eo_pipeline/components/storage.py`
 Purpose: secure archiving and retrieval.
@@ -283,7 +317,17 @@ Key responsibilities:
 Design rationale:
 - Ensures availability and reduces operational risk.
 
-### 10.9. `secure_eo_pipeline/utils/security.py`
+### 10.7. `secure_eo_pipeline/ml/`
+Purpose: lightweight ML-inspired scoring.
+
+Key responsibilities:
+1. `features.py` extracts simple numerical features from EO arrays and log windows.
+2. `models.py` computes threshold-based anomaly scores (no heavy dependencies required).
+
+Design rationale:
+- Provides realistic hooks for anomaly detection without complicating the stack. Can later be replaced with full ML models.
+
+### 10.8. `secure_eo_pipeline/utils/security.py`
 Purpose: cryptographic utilities.
 
 Key responsibilities:
@@ -294,7 +338,7 @@ Key responsibilities:
 Design rationale:
 - Centralizing cryptographic primitives reduces code duplication and mistakes.
 
-### 10.10. `secure_eo_pipeline/utils/logger.py`
+### 10.9. `secure_eo_pipeline/utils/logger.py`
 Purpose: unified audit logging.
 
 Key responsibilities:
@@ -358,7 +402,7 @@ At this stage:
 Sensitive operations are protected by access control.
 1. **Operator Action**: `login`
 2. **System Behavior**:
-    - The system displays the list of predefined identities (configured in `config.py`):
+    - In **DEMO** mode the system can display the list of predefined identities (configured in `config.py` and seeded into SQLite):
 
 
         | **User** | **Role** | **Password (Demo)** | **Description** |
@@ -366,11 +410,12 @@ Sensitive operations are protected by access control.
         | **admin** | Admin | `admin123` | Full privileges, including disaster recovery |
         | **analyst** | Analyst | `analyst123` | Processing and archiving permissions |
         | **user** | User | `user123` | Read-only access |
-        | **hacker** | None | `hacker123` | Explicitly unauthorized identity (Banned) |
+
+      In **SECURE** mode the directory is not enumerated on screen, to avoid leaking usernames to a potential attacker watching the console.
 
     - The operator selects a username and enters the password (hidden input).
 	- Authentication and role assignment are enforced.
-	- **Note:** Passwords are now hashed using `bcrypt` for security.
+	- **Note:** Passwords are hashed using `bcrypt` for security.
 	- All subsequent actions are authorized based on the assigned role.
 
 ### 11.4. EO Data Generation (scan)
@@ -440,11 +485,12 @@ This represents a disk-level or malicious tampering scenario.
 
 This demonstrates automated resilience and self-healing behavior.
 
-#### 11.8.3. Intrusion Detection (ids)
+#### 11.8.3. Intrusion Detection and Log Analytics (ids)
 ```ids```
-- The operator scans the `audit.log` for suspicious patterns.
-- If an attack (like the `hack` above) or brute force attempt occurred, it is flagged.
-- A critical alert is displayed on the console.
+- The operator scans the `audit.log` or the structured DB (`audit_events`) for suspicious patterns.
+- If an attack (like the `hack` above), brute force attempt, privilege escalation or backup sabotage occurred, it is flagged.
+- When `USE_ML` is enabled, an additional anomaly score over the full log window is computed and surfaced as a `ML Log Anomaly` incident.
+- A color-coded threat report is displayed on the console.
 
 #### 11.8.4. Key Rotation (rotate_keys) — Admin Only
 ```rotate_keys```
@@ -618,7 +664,7 @@ This allows the system to recover from potential key compromise without losing d
 ### 21.3. Intrusion Detection System (IDS)
 Actively hunts for threats in the `audit.log`. The `ids` command uses pattern matching to detect:
 - **Brute Force Attacks**: Multiple failed login attempts.
-- **Insider Threats**: Activity from known blacklisted users (`hacker`).
+- **Insider / External Threats**: Suspicious activity such as repeated attempts with non-existent or blocked usernames (e.g. an external attacker guessing `hacker`), or access denials for legitimate users.
 - **Data Tampering**: Confirmed corruption events on the archive.
 
 It produces a color-coded threat report, simulating a Security Operations Center (SOC) dashboard.

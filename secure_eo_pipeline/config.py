@@ -45,6 +45,11 @@ ARCHIVE_DIR = os.path.join(BASE_DIR, "secure_archive")  # Defines `ARCHIVE_DIR` 
 # PURPOSE: Disaster Recovery. If the Archive is corrupted, we restore from here.
 BACKUP_DIR = os.path.join(BASE_DIR, "backup_storage")  # Defines `BACKUP_DIR` path
 
+# [Security Database]
+# Centralized SQLite database for identities and structured audit logs.
+# SECURITY LEVEL: HIGH (Contains credentials and security telemetry).
+SQLITE_DB_PATH = os.path.join(BASE_DIR, "eo_security.db")
+
 # Path to the symmetric encryption key file.
 # WARNING: This is a critical security asset. In this simulation, it's a local file.
 # In a real system, this would be managed by an HSM (Hardware Security Module).
@@ -60,6 +65,22 @@ directories = [INGEST_DIR, PROCESSING_DIR, ARCHIVE_DIR, BACKUP_DIR]  # Defines `
 # We implement a Role-Based Access Control (RBAC) model.
 # Principle: "Least Privilege" -> Users only get what they absolutely need to work.
 # -----------------------------------------------------------------------------
+
+# Feature flags to enable/disable optional subsystems.
+# These toggles make it easy to demo the original file-based behaviour or the
+# new SQLite/ML capabilities without changing the code everywhere.
+USE_SQLITE = True  # When False, the system falls back to USERS_DB and file-only logs
+USE_ML = False     # Will gate the ML-based features once implemented
+
+# Operating mode:
+# - "DEMO": relaxed behaviour, educational output, minimal restrictions.
+# - "SECURE": enables stricter IAM policies (password rules, lockout, etc.).
+# Default is SECURE to demonstrate hardened behaviour unless explicitly relaxed.
+MODE = os.getenv("EO_PIPELINE_MODE", "SECURE").upper()
+
+# IAM security settings (used primarily in SECURE mode)
+MAX_FAILED_LOGINS = int(os.getenv("EO_MAX_FAILED_LOGINS", "5"))
+LOCKOUT_SECONDS = int(os.getenv("EO_LOCKOUT_SECONDS", "60"))
 
 # Define the Roles and their associated permissions
 ROLES = {
@@ -102,10 +123,5 @@ USERS_DB = {
         "role": "user",
         # Password: 'user123'
         "hash": "$2b$12$cZXqc.jcZrzeIoxmNyWHN.4l0iQ7ZRhulB64yvKPK5NgbJ6oSjjrG"
-    },
-    "hacker": {
-        "role": "none",
-        # Password: 'hacker123' (Not that it matters, she has no role)
-        "hash": "$2b$12$m8kxNIoCKQmSytgMD/dJOeB34uiYSFM38DcKCJcuBAaqXy5ROaZUa"
     }
 }

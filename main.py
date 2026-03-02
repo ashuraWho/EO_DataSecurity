@@ -6,6 +6,7 @@ import random  # To generate non-deterministic product identifiers.
 from rich.console import Console  # To handle styled terminal output
 from rich.panel import Panel  # To draw boxed UI elements
 from rich.table import Table  # To format tabular output
+from rich import box  # For table border styles
 from rich.prompt import Prompt  # To collect interactive input
 from rich.progress import track  # For hacker-style progress bars
 
@@ -19,6 +20,7 @@ from secure_eo_pipeline.resilience.backup_system import ResilienceManager  # To 
 from secure_eo_pipeline.resilience.backup_system import ResilienceManager  # To back up and restore files
 from secure_eo_pipeline.utils import security  # For hashing in recovery logic
 from secure_eo_pipeline.components.ids import IntrusionDetectionSystem # For log analysis
+from secure_eo_pipeline.db import sqlite_adapter
 
 # Create a global Rich Console for all printing operations
 console = Console()
@@ -123,21 +125,49 @@ class InteractiveSession:
         table = Table(title="\nAvailable Operator Commands\n", box=None)
         
         # Define the header columns
-        table.add_column("Command", style="bold cyan")  # Adds the Command column with cyan style
-        table.add_column("Description", style="white")  # Adds the Description column with white style
+        table.add_column("Command", style="bold cyan")
+        table.add_column("Description", style="white")
         
-        # Populate the table with system capabilities
-        table.add_row("login", "Authenticate with your mission credentials")
-        table.add_row("logout", "Terminate the current secure session")
-        table.add_row("scan", "Acquire new raw signal from Satellite (L0)")
-        table.add_row("ingest", "Verify, fingerprint, and stage data")
-        table.add_row("process", "Run calibration and Quality Control (L1)")
-        table.add_row("archive", "Apply Fernet encryption and vault data")
-        table.add_row("hack", "SIMULATION: Corrupt the primary archive disk")
-        table.add_row("recover", "Trigger automated hash-audit and repair")
-        table.add_row("rotate_keys", "SECURITY: Re-encrypt archive with new keys (Admin)")
-        table.add_row("ids", "SECURITY: Scan logs for intrusion patterns")
-        table.add_row("status", "Show lifecycle checklist for active target")
+        # Core pipeline
+        table.add_row("[bold underline]Core pipeline[/bold underline]", "")
+        table.add_row("login", "Authenticate as an operator")
+        table.add_row("logout", "End the current session")
+        table.add_row("scan", "Generate a new synthetic product")
+        table.add_row("ingest", "Validate and fingerprint raw data")
+        table.add_row("process", "Run calibration and QC checks")
+        table.add_row("archive", "Encrypt and store the product")
+        table.add_row("recover", "Verify archive integrity and restore from backup")
+        table.add_row("status", "Show lifecycle state for the active product")
+        table.add_row("", "")
+
+        # Security operations
+        table.add_row("[bold underline]Security operations[/bold underline]", "")
+        table.add_row("hack", "Simulate corruption of the encrypted archive")
+        table.add_row("ids", "Run intrusion detection on audit data")
+        table.add_row("rotate_keys", "Rotate cryptographic keys (admin only)")
+        table.add_row("health", "Run basic health checks on config, DB, and directories")
+        table.add_row("", "")
+
+        # Attack scenarios (demo)
+        table.add_row("[bold underline]Attack scenarios[/bold underline]", "")
+        table.add_row("scenario_bruteforce_login", "Simulate a brute-force login attack")
+        table.add_row("scenario_tamper_metadata", "Simulate metadata tampering")
+        table.add_row("scenario_delete_backup", "Simulate backup sabotage")
+        table.add_row("scenario_full_attack", "Run the full multi-step attack narrative")
+        table.add_row("", "")
+
+        # User and IAM management
+        table.add_row("[bold underline]User & IAM (admin)[/bold underline]", "")
+        table.add_row("user_add", "Create or update a user account")
+        table.add_row("user_list", "List all user accounts")
+        table.add_row("user_remove", "Delete a user account")
+        table.add_row("user_change_role", "Change a user's role")
+        table.add_row("user_disable", "Disable or re-enable a user account")
+        table.add_row("", "")
+
+        # Utility
+        table.add_row("[bold underline]Utility[/bold underline]", "")
+        table.add_row("help", "Show this command list")
         table.add_row("exit", "Close the console")
         
         # Output the table to the console
@@ -180,10 +210,24 @@ class InteractiveSession:
         Authenticates an operator using the Access Control component.
         """
         
-        console.print("\n[bold underline]Mission Personnel Directory:[/bold underline]")  # Prints a header listing valid users
-        # Display valid users to assist the simulation operator
-        for u in config.USERS_DB.keys():  # Iterates over the configured user dictionary
-            console.print(f" - {u}")  # Prints each user and role to assist the operator
+        # In SECURE mode we avoid enumerating concrete account names to reduce
+        # the risk of username disclosure. In DEMO mode we show them to help
+        # the learner.
+        console.print("\n[bold underline]Mission Personnel Directory:[/bold underline]")
+        if config.MODE == "DEMO":
+            # Display known users to assist the simulation operator
+            if getattr(config, "USE_SQLITE", False):
+                users = sqlite_adapter.list_users()
+                for u in users:
+                    status = "[red]DISABLED[/red]" if u["disabled"] else "[green]ACTIVE[/green]"
+                    console.print(f" - {u['username']} ({u['role']}) {status}")
+            else:
+                for u, record in config.USERS_DB.items():
+                    role = record["role"]
+                    status = "[green]ACTIVE[/green]"
+                    console.print(f" - {u} ({role}) {status}")
+        else:
+            console.print("[dim]User list is hidden in SECURE mode. Please enter your assigned username.[/dim]")
             
         # Capture user input
         user = Prompt.ask("\nEnter Username")
@@ -273,7 +317,10 @@ class InteractiveSession:
         #     self.source.generate_product(pid)
 
         # UI Upgrade: Hacker-style progress bar
-        for _ in track(range(20), description="[cyan]Acquiring Satellite Downlink (X-Band)...[/cyan]", spinner="earth"):
+        # Note: `track` only supports an iterable and optional description; for
+        # spinners we would need a different Rich primitive. Here we keep a
+        # simple progress bar for clarity and compatibility.
+        for _ in track(range(20), description="[cyan]Acquiring Satellite Downlink (X-Band)...[/cyan]"):
             time.sleep(2)  # 2 seconds total
         self.source.generate_product(pid)
         
@@ -342,7 +389,7 @@ class InteractiveSession:
         #     path = self.processor.process_product(self.active_product)  # Calls the processing engine and captures the path
 
         # UI Upgrade: Progress bar
-        for _ in track(range(15), description="[magenta]Calibrating Radiometric Sensors (Level-0 -> Level-1)...[/magenta]", spinner="dots"):
+        for _ in track(range(15), description="[magenta]Calibrating Radiometric Sensors (Level-0 -> Level-1)...[/magenta]"):
             time.sleep(1.5)
         path = self.processor.process_product(self.active_product)
             
@@ -384,6 +431,103 @@ class InteractiveSession:
         console.print("[green]✅ Archiving successful.[/green] Data is encrypted-at-rest.")  # Prints success message
 
 
+    # ---------------------------------------------------------------------
+    # User management commands (Admin-only, backed by AccessController)
+    # ---------------------------------------------------------------------
+
+    def user_add(self):
+        
+        """
+        COMMAND: user_add
+        Creates or updates a user account (Admin only).
+        """
+        
+        if not self.check_auth("manage_keys"):
+            return
+
+        username = Prompt.ask("Enter new username")
+        role = Prompt.ask("Assign role", choices=list(config.ROLES.keys()))
+        password = console.input("[bold]Enter Password for user:[/bold] ", password=True)
+
+        self.ac.create_user(username, password, role)
+        console.print(f"[green]✅ User '{username}' created/updated with role '{role}'.[/green]")
+
+    def user_list(self):
+        
+        """
+        COMMAND: user_list
+        Lists all user accounts (Admin only).
+        """
+        
+        if not self.check_auth("manage_keys"):
+            return
+
+        users = self.ac.list_users()
+
+        table = Table(title="User Directory", box=None)
+        table.add_column("Username", style="bold cyan")
+        table.add_column("Role", style="white")
+        table.add_column("Status", style="white")
+        table.add_column("Created At", style="dim")
+
+        for u in users:
+            status = "[red]DISABLED[/red]" if u["disabled"] else "[green]ACTIVE[/green]"
+            table.add_row(u["username"], u["role"], status, u.get("created_at", "N/A"))
+
+        console.print(table)
+
+    def user_remove(self):
+        
+        """
+        COMMAND: user_remove
+        Deletes a user account (Admin only).
+        """
+        
+        if not self.check_auth("manage_keys"):
+            return
+
+        username = Prompt.ask("Enter username to delete")
+        confirm = Prompt.ask(f"Are you sure you want to delete '{username}'? (yes/no)", choices=["yes", "no"], default="no")
+        if confirm == "no":
+            console.print("[yellow]Deletion cancelled.[/yellow]")
+            return
+
+        self.ac.delete_user(username)
+        console.print(f"[green]✅ User '{username}' deleted.[/green]")
+
+    def user_change_role(self):
+        
+        """
+        COMMAND: user_change_role
+        Changes the role assigned to a user (Admin only).
+        """
+        
+        if not self.check_auth("manage_keys"):
+            return
+
+        username = Prompt.ask("Enter username to modify")
+        role = Prompt.ask("New role", choices=list(config.ROLES.keys()))
+        self.ac.update_role(username, role)
+        console.print(f"[green]✅ User '{username}' role updated to '{role}'.[/green]")
+
+    def user_disable(self):
+        
+        """
+        COMMAND: user_disable
+        Disables or enables a user account (Admin only).
+        """
+        
+        if not self.check_auth("manage_keys"):
+            return
+
+        username = Prompt.ask("Enter username to modify")
+        action = Prompt.ask("Choose action", choices=["disable", "enable"], default="disable")
+        disabled = action == "disable"
+        self.ac.set_disabled(username, disabled)
+        state_label = "disabled" if disabled else "enabled"
+        console.print(f"[green]✅ User '{username}' {state_label}.[/green]")
+
+
 
     def hack(self):  # To simulate corruption
         
@@ -397,7 +541,9 @@ class InteractiveSession:
             console.print("[yellow]⚠️ Error: No archived data found to simulate an attack upon.[/yellow]")  # Prints warning if no archived product exists
             return  # Returns early to avoid errors
             
-        console.print("[bold red]☠️ INITIATING SIMULATED DATA CORRUPTION...[/bold red]")  # Prints a dramatic warning message
+        console.print("[bold red]☠️ INITIATING SIMULATED DATA CORRUPTION SCENARIO...[/bold red]")  # Prints a dramatic warning message
+        console.print("[dim]Step 1: Attacker gains unauthorized filesystem access to the secure archive.[/dim]")
+        console.print("[dim]Step 2: Attacker locates the encrypted product and overwrites it with garbage.[/dim]")
         
         # Determine the physical path of the vaulted file
         target = os.path.join(config.ARCHIVE_DIR, f"{self.active_product}.enc")  # Constructs the encrypted file path
@@ -412,6 +558,162 @@ class InteractiveSession:
             console.print(f"[red]✅ Attack successful.[/red] Primary data file has been corrupted.")  # Prints attack success message
         else:  # Else branch for missing file
             console.print("[red]❌ Attack failed: File not located.[/red]")  # Prints failure message for missing file
+
+
+    def scenario_bruteforce_login(self):
+        
+        """
+        COMMAND: scenario_bruteforce_login
+        Simulates a brute-force attack with repeated failed logins by a malicious actor.
+        """
+        
+        console.print("[bold red]⚠️ SCENARIO: Brute-Force Login Attack[/bold red]")
+        console.print("[dim]An external attacker repeatedly guesses passwords for a high-value account.[/dim]")
+
+        target_user = Prompt.ask("Target username for brute-force (default: hacker)", default="hacker")
+        attempts = 5
+
+        for i in range(1, attempts + 1):
+            console.print(f"[dim]Attempt {i}/{attempts} with wrong password...[/dim]")
+            # Always supply an incorrect password
+            self.ac.authenticate(target_user, "wrong_password!")
+            time.sleep(0.3)
+
+        console.print("[yellow]Brute-force simulation complete. Run 'ids' to see detection results.[/yellow]")
+
+
+    def scenario_tamper_metadata(self):
+        
+        """
+        COMMAND: scenario_tamper_metadata
+        Simulates an attacker modifying product metadata without touching the binary data.
+        """
+        
+        if not self.active_product or not self.state["processed"]:
+            console.print("[yellow]⚠️ Error: You need a processed product to tamper with. Run 'scan', 'ingest', 'process' first.[/yellow]")
+            return
+
+        console.print("[bold red]⚠️ SCENARIO: Metadata Tampering[/bold red]")
+        console.print("[dim]An insider modifies product metadata to hide anomalies or fake provenance.[/dim]")
+
+        meta_path = os.path.join(config.PROCESSING_DIR, f"{self.active_product}.json")
+        if not os.path.exists(meta_path):
+            console.print("[red]❌ Cannot find metadata file to tamper with.[/red]")
+            return
+
+        # Perform a subtle but detectable tampering: override qc_status and hash fields
+        try:
+            import json
+
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+
+            meta["qc_status"] = "FORCED_OK"
+            meta["tampered_flag"] = True
+            if "original_hash" in meta:
+                meta["original_hash"] = "0000TAMPERED0000"
+
+            with open(meta_path, "w") as f:
+                json.dump(meta, f, indent=4)
+
+            console.print("[red]✅ Metadata tampered.[/red] Run 'process' or 'archive' again to see integrity checks react.")
+        except Exception as e:
+            console.print(f"[red]❌ Failed to tamper metadata: {e}[/red]")
+
+
+    def scenario_delete_backup(self):
+        
+        """
+        COMMAND: scenario_delete_backup
+        Simulates an attacker sabotaging the backup copy to break resilience.
+        """
+        
+        if not self.active_product or not self.state["archived"]:
+            console.print("[yellow]⚠️ Error: You need an archived product with backup. Run 'archive' first.[/yellow]")
+            return
+
+        console.print("[bold red]⚠️ SCENARIO: Backup Sabotage[/bold red]")
+        console.print("[dim]An attacker with elevated privileges deletes the backup copy to prevent recovery.[/dim]")
+
+        backup_path = os.path.join(config.BACKUP_DIR, f"{self.active_product}.enc")
+        if not os.path.exists(backup_path):
+            console.print("[yellow]Backup file not found. Perhaps it was never created or already removed.[/yellow]")
+            return
+
+        try:
+            os.remove(backup_path)
+            console.print("[red]✅ Backup deleted. System resilience has been weakened.[/red]")
+        except Exception as e:
+            console.print(f"[red]❌ Failed to delete backup: {e}[/red]")
+
+
+    def scenario_full_attack(self):
+        
+        """
+        COMMAND: scenario_full_attack
+        Runs a full multi-step attack narrative:
+        1) Brute-force attempts against an account.
+        2) Insider-style metadata tampering on a processed product.
+        3) Backup sabotage on an archived product.
+        4) Direct corruption of the archive (hack).
+        5) Intrusion detection scan (ids).
+        """
+        
+        console.print("[bold red]☠️ SCENARIO: FULL ATTACK KILL CHAIN[/bold red]")
+        console.print("[dim]This guided scenario chains together multiple attack techniques and then runs IDS.[/dim]")
+
+        # Ensure we have a product going through the pipeline
+        if not self.active_product or not self.state["generated"]:
+            console.print("[cyan]No active product found. Generating one via 'scan'...[/cyan]")
+            self.scan()
+
+        # Require authentication for protected steps
+        if not self.current_user:
+            console.print("[yellow]You must be logged in to continue. Please authenticate as an analyst or admin.[/yellow]")
+            self.login()
+            if not self.current_user:
+                console.print("[red]Aborting full attack scenario: authentication failed.[/red]")
+                return
+
+        # Step 1: Ingestion and processing (if not already done)
+        if not self.state["ingested"]:
+            console.print("[cyan]Step 1: Secure ingestion of the new product.[/cyan]")
+            self.ingest()
+
+        if not self.state["processed"]:
+            console.print("[cyan]Step 2: Scientific processing and QC.[/cyan]")
+            self.process()
+
+        # Step 3: Archive and backup
+        if not self.state["archived"]:
+            console.print("[cyan]Step 3: Secure archiving and backup creation.[/cyan]")
+            self.archive()
+
+        # Step 4: Brute-force attempts against a high-value account
+        console.print("[cyan]Step 4: Simulating external brute-force attempts against 'admin'.[/cyan]")
+        target_user = "admin"
+        for i in range(1, 4):
+            console.print(f"[dim]Brute-force attempt {i}/3 on '{target_user}'...[/dim]")
+            self.ac.authenticate(target_user, "wrong_password!")
+            time.sleep(0.2)
+
+        # Step 5: Insider-style metadata tampering
+        console.print("[cyan]Step 5: Insider tampers with processing metadata.[/cyan]")
+        self.scenario_tamper_metadata()
+
+        # Step 6: Backup sabotage
+        console.print("[cyan]Step 6: Attacker deletes the backup to weaken resilience.[/cyan]")
+        self.scenario_delete_backup()
+
+        # Step 7: Direct archive corruption
+        console.print("[cyan]Step 7: Attacker corrupts the encrypted archive file.[/cyan]")
+        self.hack()
+
+        # Step 8: Intrusion detection
+        console.print("[cyan]Step 8: Running IDS over accumulated logs and DB events.[/cyan]")
+        self.run_ids()
+
+        console.print("[green]✅ Full attack scenario completed. Review IDS output and audit logs for details.[/green]")
 
 
 
@@ -497,7 +799,7 @@ class InteractiveSession:
         # Display Report
         console.print(f"\n[bold red]🚨 THREATS DETECTED: {len(incidents)}[/bold red]")
         
-        table = Table(title="Intrusion Detection Report", box="heavy_edge")
+        table = Table(title="Intrusion Detection Report", box=box.HEAVY_EDGE)
         table.add_column("Severity", style="bold")
         table.add_column("Type", style="cyan")
         table.add_column("Details", style="white")
@@ -512,6 +814,66 @@ class InteractiveSession:
         
         console.print(table)
         console.print("[dim]Recommended Action: Review audit.log and rotate keys if necessary.[/dim]\n")
+
+
+    def health(self):
+        
+        """
+        COMMAND: health
+        Runs basic health checks on configuration, database and filesystem layout.
+        """
+        
+        table = Table(title="System Health Check", box=None)
+        table.add_column("Component", style="bold cyan")
+        table.add_column("Status", style="white")
+        table.add_column("Details", style="dim")
+
+        # Config / mode
+        table.add_row(
+            "MODE",
+            f"[green]{config.MODE}[/green]",
+            "Operating mode (DEMO/SECURE) loaded from config/environment.",
+        )
+
+        # Directories
+        for label, path in [
+            ("INGEST_DIR", config.INGEST_DIR),
+            ("PROCESSING_DIR", config.PROCESSING_DIR),
+            ("ARCHIVE_DIR", config.ARCHIVE_DIR),
+            ("BACKUP_DIR", config.BACKUP_DIR),
+        ]:
+            exists = os.path.isdir(path)
+            status = "[green]OK[/green]" if exists else "[yellow]MISSING[/yellow]"
+            table.add_row(label, status, path)
+
+        # SQLite
+        if getattr(config, "USE_SQLITE", False):
+            try:
+                conn = sqlite_adapter.get_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM users")
+                users_count = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM audit_events")
+                events_count = cur.fetchone()[0]
+                table.add_row(
+                    "SQLite",
+                    "[green]OK[/green]",
+                    f"Users={users_count}, Audit events={events_count}",
+                )
+            except Exception as e:
+                table.add_row(
+                    "SQLite",
+                    "[red]ERROR[/red]",
+                    f"DB issue: {e}",
+                )
+        else:
+            table.add_row(
+                "SQLite",
+                "[yellow]DISABLED[/yellow]",
+                "USE_SQLITE is False; using in-memory USERS_DB and file logs only.",
+            )
+
+        console.print(table)
 
     def run(self):  # To start the command loop
         
@@ -575,6 +937,36 @@ class InteractiveSession:
 
                 elif cmd == "ids":
                     self.run_ids()
+                
+                elif cmd == "scenario_bruteforce_login":
+                    self.scenario_bruteforce_login()
+
+                elif cmd == "scenario_tamper_metadata":
+                    self.scenario_tamper_metadata()
+
+                elif cmd == "scenario_delete_backup":
+                    self.scenario_delete_backup()
+                
+                elif cmd == "scenario_full_attack":
+                    self.scenario_full_attack()
+                
+                elif cmd == "user_add":
+                    self.user_add()
+
+                elif cmd == "user_list":
+                    self.user_list()
+
+                elif cmd == "user_remove":
+                    self.user_remove()
+
+                elif cmd == "user_change_role":
+                    self.user_change_role()
+
+                elif cmd == "user_disable":
+                    self.user_disable()
+                
+                elif cmd == "health":
+                    self.health()
                     
                 elif cmd == "":  # Checks for empty input
                     pass  # Do nothing for empty input
