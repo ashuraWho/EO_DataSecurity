@@ -104,12 +104,14 @@ In SECURE mode, accounts are temporarily locked after too many failed login atte
 ## 5. Repository Structure
 1. `main.py` Interactive operator console (CLI) and orchestration.
 2. `secure_eo_pipeline/` Core pipeline package.
-3. `secure_eo_pipeline/components/` Data source, ingestion, processing, storage, and RBAC.
+3. `secure_eo_pipeline/components/` Data source, ingestion, processing, storage, RBAC, and IDS.
 4. `secure_eo_pipeline/resilience/` Backup and self‑healing logic.
 5. `secure_eo_pipeline/utils/` Cryptography and logging utilities.
-6. `secure_eo_pipeline/config.py` Central configuration and policy definitions.
-7. `simulation_data/` Runtime artifacts (generated).
-8. `secret.key` Symmetric encryption key for the simulation.
+6. `secure_eo_pipeline/db/` SQLite adapter for users and structured audit events.
+7. `secure_eo_pipeline/ml/` Lightweight feature extraction and anomaly scoring helpers.
+8. `secure_eo_pipeline/config.py` Central configuration and policy definitions.
+9. `simulation_data/` Runtime artifacts (generated).
+10. `secret.key` Symmetric encryption key for the simulation.
 
 ---
 
@@ -243,7 +245,8 @@ Purpose: centralized configuration and policy definition.
 Key responsibilities:
 1. Defines filesystem layout for trust zones.
 2. Defines RBAC roles and permissions.
-3. Defines user‑to‑role mappings.
+3. Defines user‑to‑role mappings and IAM security parameters (e.g. lockout thresholds, mode).
+4. Enables or disables optional subsystems (SQLite, ML) and sets the default operating mode (`SECURE` by default).
 
 Design rationale:
 - Central configuration prevents hardcoding and allows policy changes without modifying core logic.
@@ -299,9 +302,11 @@ Design rationale:
 Purpose: RBAC enforcement.
 
 Key responsibilities:
-1. Authenticate users.
-2. Authorize actions based on role permissions.
-3. Log security events.
+1. Authenticate users against either the in‑memory mock DB (`USERS_DB`) or the SQLite `users` table.
+2. Authorize actions based on role permissions defined in `config.ROLES`.
+3. Enforce password policy and temporary account lockout in SECURE mode.
+4. Provide admin‑level user management primitives (create/update/delete users, change roles, enable/disable accounts).
+5. Log security events (auth successes/failures, role changes, lockouts) to the unified audit logger.
 
 Design rationale:
 - Prevents unauthorized operations and supports auditability.
@@ -317,7 +322,18 @@ Key responsibilities:
 Design rationale:
 - Ensures availability and reduces operational risk.
 
-### 10.7. `secure_eo_pipeline/ml/`
+### 10.9. `secure_eo_pipeline/db/sqlite_adapter.py`
+Purpose: SQLite database access layer.
+
+Key responsibilities:
+1. Manage a singleton SQLite connection and ensure the schema exists.
+2. Provide CRUD functions for the `users` table (used by the access control layer).
+3. Provide an insertion helper for the `audit_events` table (used by the logging subsystem).
+
+Design rationale:
+- Centralizes all SQL details in one place and keeps the rest of the codebase database‑agnostic. Makes it easy to replace SQLite with another backend in the future.
+
+### 10.10. `secure_eo_pipeline/ml/`
 Purpose: lightweight ML-inspired scoring.
 
 Key responsibilities:
@@ -327,7 +343,7 @@ Key responsibilities:
 Design rationale:
 - Provides realistic hooks for anomaly detection without complicating the stack. Can later be replaced with full ML models.
 
-### 10.8. `secure_eo_pipeline/utils/security.py`
+### 10.11. `secure_eo_pipeline/utils/security.py`
 Purpose: cryptographic utilities.
 
 Key responsibilities:
@@ -338,7 +354,7 @@ Key responsibilities:
 Design rationale:
 - Centralizing cryptographic primitives reduces code duplication and mistakes.
 
-### 10.9. `secure_eo_pipeline/utils/logger.py`
+### 10.12. `secure_eo_pipeline/utils/logger.py`
 Purpose: unified audit logging.
 
 Key responsibilities:
@@ -492,6 +508,22 @@ This demonstrates automated resilience and self-healing behavior.
 - When `USE_ML` is enabled, an additional anomaly score over the full log window is computed and surfaced as a `ML Log Anomaly` incident.
 - A color-coded threat report is displayed on the console.
 
+#### 11.8.5. Attack simulations (scenario commands)
+
+The system includes dedicated commands that orchestrate end‑to‑end attack narratives for educational purposes:
+
+- `scenario_bruteforce_login`  
+  Replays repeated login failures against a chosen username to generate a brute‑force pattern in the logs, later detected by the IDS.
+
+- `scenario_tamper_metadata`  
+  Modifies processing metadata (QC status and integrity fields) without touching the underlying data to demonstrate integrity and provenance checks.
+
+- `scenario_delete_backup`  
+  Deletes the encrypted backup copy of a product, simulating sabotage of resilience mechanisms.
+
+- `scenario_full_attack`  
+  Chains together a complete “kill chain”: generate and ingest a product, process and archive it, perform brute‑force attempts, tamper with metadata, sabotage the backup, corrupt the archive, and finally run the IDS. This is the recommended scenario for showing the full defense‑in‑depth story.
+
 #### 11.8.4. Key Rotation (rotate_keys) — Admin Only
 ```rotate_keys```
 - Start the key rotation process.
@@ -551,19 +583,62 @@ All runtime artifacts live under `simulation_data/`:
 ---
 
 ## 15. CLI Command Reference
-1. `help` Show command list.
-2. `login` Authenticate a user.
-3. `logout` End session.
-4. `scan` Generate a synthetic product.
-5. `ingest` Validate and fingerprint data.
-6. `process` Run QC and calibration.
-7. `archive` Encrypt and vault data.
-8. `hack` Simulate corruption of archive data.
-9. `recover` Verify and restore from backup.
-11. `rotate_keys` Re-encrypt the archive with a fresh key (Admin only).
-12. `ids` Scan audit logs for intrusion patterns.
-13. `status` Show lifecycle status.
-14. `exit` Quit the console.
+
+### 15.1. Core pipeline
+1. `login`  
+   Authenticate as an operator using the access control component.
+2. `logout`  
+   End the current session and clear identity.
+3. `scan`  
+   Generate a new synthetic EO product in the ingest landing zone.
+4. `ingest`  
+   Validate metadata, compute the initial hash, and move data into the processing zone.
+5. `process`  
+   Verify integrity, run QC, normalize data, and update metadata (including optional ML scores).
+6. `archive`  
+   Encrypt the processed product, move it into the secure archive, and create a backup copy.
+7. `status`  
+   Show the lifecycle state (generated/ingested/processed/archived/hacked) for the active product.
+
+### 15.2. Security operations
+8. `hack`  
+   Simulate a disk‑level corruption of the encrypted archive file for the active product.
+9. `recover`  
+   Verify archive integrity against the backup and restore from the backup if corruption is detected (admin only).
+10. `ids`  
+    Run the intrusion detection logic over audit logs and/or the SQLite `audit_events` table.
+11. `rotate_keys`  
+    Rotate cryptographic keys across all encrypted archive and backup files (admin only).
+12. `health`  
+    Run basic health checks on configuration, required directories, and the SQLite database.
+
+### 15.3. Attack scenarios (simulation)
+13. `scenario_bruteforce_login`  
+    Simulate a brute‑force login attack with repeated failed attempts against a target username.
+14. `scenario_tamper_metadata`  
+    Simulate tampering with processing metadata to show integrity and provenance protections.
+15. `scenario_delete_backup`  
+    Simulate backup sabotage by deleting the redundant encrypted copy.
+16. `scenario_full_attack`  
+    Run a full multi‑step attack story (brute‑force, metadata tampering, backup sabotage, archive corruption, IDS).
+
+### 15.4. User & IAM management (admin)
+17. `user_add`  
+    Create or update a user account with a given role (enforces password policy in SECURE mode).
+18. `user_list`  
+    List all user accounts, roles, status (enabled/disabled), and creation timestamps.
+19. `user_remove`  
+    Permanently delete a user account.
+20. `user_change_role`  
+    Change the role assigned to an existing user.
+21. `user_disable`  
+    Disable or re‑enable a user account.
+
+### 15.5. Utility
+22. `help`  
+    Display the command list with grouped descriptions.
+23. `exit`  
+    Quit the console.
 
 ---
 
