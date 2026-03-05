@@ -938,31 +938,31 @@ class InteractiveSession:
                 elif cmd == "ids":
                     self.run_ids()
                 
-                elif cmd == "scenario_bruteforce_login":
+                elif cmd == "bruteforce_login":
                     self.scenario_bruteforce_login()
 
-                elif cmd == "scenario_tamper_metadata":
+                elif cmd == "tamper_metadata":
                     self.scenario_tamper_metadata()
 
-                elif cmd == "scenario_delete_backup":
+                elif cmd == "delete_backup":
                     self.scenario_delete_backup()
                 
-                elif cmd == "scenario_full_attack":
+                elif cmd == "full_attack":
                     self.scenario_full_attack()
                 
-                elif cmd == "user_add":
+                elif cmd == "add":
                     self.user_add()
 
-                elif cmd == "user_list":
+                elif cmd == "list":
                     self.user_list()
 
-                elif cmd == "user_remove":
+                elif cmd == "remove":
                     self.user_remove()
 
-                elif cmd == "user_change_role":
+                elif cmd == "change_role":
                     self.user_change_role()
 
-                elif cmd == "user_disable":
+                elif cmd == "disable":
                     self.user_disable()
                 
                 elif cmd == "health":
