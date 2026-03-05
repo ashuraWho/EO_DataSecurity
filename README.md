@@ -199,7 +199,7 @@ The `IngestionManager`:
 ### 9.3. Processing and Quality Control
 The `ProcessingEngine`:
 1. Verifies integrity by comparing hashes.
-2. Performs QC (rejects NaN values).
+2. Performs QC (Quality Control) (rejects NaN values).
 3. Normalizes values into 0.0–1.0 reflectance range.
 4. Writes a new hash for the processed data.
 
@@ -512,16 +512,16 @@ This demonstrates automated resilience and self-healing behavior.
 
 The system includes dedicated commands that orchestrate end‑to‑end attack narratives for educational purposes:
 
-- `scenario_bruteforce_login`  
+- `bruteforce_login`  
   Replays repeated login failures against a chosen username to generate a brute‑force pattern in the logs, later detected by the IDS.
 
-- `scenario_tamper_metadata`  
+- `tamper_metadata`  
   Modifies processing metadata (QC status and integrity fields) without touching the underlying data to demonstrate integrity and provenance checks.
 
-- `scenario_delete_backup`  
+- `delete_backup`  
   Deletes the encrypted backup copy of a product, simulating sabotage of resilience mechanisms.
 
-- `scenario_full_attack`  
+- `full_attack`  
   Chains together a complete “kill chain”: generate and ingest a product, process and archive it, perform brute‑force attempts, tamper with metadata, sabotage the backup, corrupt the archive, and finally run the IDS. This is the recommended scenario for showing the full defense‑in‑depth story.
 
 #### 11.8.4. Key Rotation (rotate_keys) — Admin Only
@@ -613,25 +613,25 @@ All runtime artifacts live under `simulation_data/`:
     Run basic health checks on configuration, required directories, and the SQLite database.
 
 ### 15.3. Attack scenarios (simulation)
-13. `scenario_bruteforce_login`  
+13. `bruteforce_login`  
     Simulate a brute‑force login attack with repeated failed attempts against a target username.
-14. `scenario_tamper_metadata`  
+14. `tamper_metadata`  
     Simulate tampering with processing metadata to show integrity and provenance protections.
-15. `scenario_delete_backup`  
+15. `delete_backup`  
     Simulate backup sabotage by deleting the redundant encrypted copy.
-16. `scenario_full_attack`  
+16. `full_attack`  
     Run a full multi‑step attack story (brute‑force, metadata tampering, backup sabotage, archive corruption, IDS).
 
 ### 15.4. User & IAM management (admin)
-17. `user_add`  
+17. `add`  
     Create or update a user account with a given role (enforces password policy in SECURE mode).
-18. `user_list`  
+18. `list`  
     List all user accounts, roles, status (enabled/disabled), and creation timestamps.
-19. `user_remove`  
+19. `remove`  
     Permanently delete a user account.
-20. `user_change_role`  
+20. `change_role`  
     Change the role assigned to an existing user.
-21. `user_disable`  
+21. `disable`  
     Disable or re‑enable a user account.
 
 ### 15.5. Utility

@@ -150,19 +150,19 @@ class InteractiveSession:
 
         # Attack scenarios (demo)
         table.add_row("[bold underline]Attack scenarios[/bold underline]", "")
-        table.add_row("scenario_bruteforce_login", "Simulate a brute-force login attack")
-        table.add_row("scenario_tamper_metadata", "Simulate metadata tampering")
-        table.add_row("scenario_delete_backup", "Simulate backup sabotage")
-        table.add_row("scenario_full_attack", "Run the full multi-step attack narrative")
+        table.add_row("bruteforce_login", "Simulate a brute-force login attack")
+        table.add_row("tamper_metadata", "Simulate metadata tampering")
+        table.add_row("delete_backup", "Simulate backup sabotage")
+        table.add_row("full_attack", "Run the full multi-step attack narrative")
         table.add_row("", "")
 
         # User and IAM management
         table.add_row("[bold underline]User & IAM (admin)[/bold underline]", "")
-        table.add_row("user_add", "Create or update a user account")
-        table.add_row("user_list", "List all user accounts")
-        table.add_row("user_remove", "Delete a user account")
-        table.add_row("user_change_role", "Change a user's role")
-        table.add_row("user_disable", "Disable or re-enable a user account")
+        table.add_row("add", "Create or update a user account")
+        table.add_row("list", "List all user accounts")
+        table.add_row("remove", "Delete a user account")
+        table.add_row("change_role", "Change a user's role")
+        table.add_row("disable", "Disable or re-enable a user account")
         table.add_row("", "")
 
         # Utility

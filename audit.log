@@ -103,3 +103,9 @@
 2026-03-02 18:09:52,738 - EO_Pipeline - WARNING - [AUTH] FAILURE: Invalid password for 'admin'.
 2026-03-02 18:09:52,954 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'process'.
 2026-03-02 18:10:01,791 - EO_Pipeline - INFO - [ACCESS] GRANTED: admin (admin) is authorized for 'process'.
+2026-03-05 14:35:28,992 - EO_Pipeline - INFO - [INGEST] START: Received ingestion request for product test_product_001
+2026-03-05 14:35:28,994 - EO_Pipeline - INFO - [INGEST] SUCCESS: Product test_product_001 is verified and staged. Initial Hash: 6fc733a9ce5d0ae3e1ad246fb21e498697a75694e5957f03b687bca628d12f56
+2026-03-05 14:35:28,996 - EO_Pipeline - INFO - [INGEST] START: Received ingestion request for product missing_data_product
+2026-03-05 14:35:28,997 - EO_Pipeline - ERROR - [INGEST] FAILED: Incomplete product. Missing files for missing_data_product.
+2026-03-05 14:35:28,999 - EO_Pipeline - INFO - [INGEST] START: Received ingestion request for product bad_schema_product
+2026-03-05 14:35:28,999 - EO_Pipeline - ERROR - [INGEST] FAILED: Schema validation failed for bad_schema_product. Error: Missing mandatory fields: {'sensor'}
